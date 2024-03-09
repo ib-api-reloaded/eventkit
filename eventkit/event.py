@@ -3,8 +3,15 @@ import logging
 import types
 import weakref
 from typing import (
-    Any as AnyType, AsyncIterable, Awaitable, Iterable, List, Optional,
-    Tuple, Union)
+    Any as AnyType,
+    AsyncIterable,
+    Awaitable,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from .util import NO_VALUE, get_event_loop, main_event_loop
 
@@ -20,8 +27,15 @@ class Event:
     """
 
     __slots__ = (
-        'error_event', 'done_event', '_name', '_value',
-        '_slots', '_done', '_source', '__weakref__')
+        "error_event",
+        "done_event",
+        "_name",
+        "_value",
+        "_slots",
+        "_done",
+        "_source",
+        "__weakref__",
+    )
 
     NO_VALUE = NO_VALUE
     logger = logging.getLogger(__name__)
@@ -34,7 +48,7 @@ class Event:
     _done: bool
     _source: Optional["Event"]
 
-    def __init__(self, name: str = '', _with_error_done_events: bool = True):
+    def __init__(self, name: str = "", _with_error_done_events: bool = True):
         self.error_event = None
         """
         Sub event that emits errors from this event as
@@ -46,8 +60,8 @@ class Event:
         ``emit(source)``.
         """
         if _with_error_done_events:
-            self.error_event = Event('error', False)
-            self.done_event = Event('done', False)
+            self.error_event = Event("error", False)
+            self.done_event = Event("done", False)
         self._slots = []  # list of [obj, weakref, func] sublists
         self._name = name or self.__class__.__qualname__
         self._value = NO_VALUE
@@ -81,11 +95,13 @@ class Event:
         This event's last emitted value.
         """
         v = self._value
-        return NO_VALUE if v is NO_VALUE else \
-            v[0] if len(v) == 1 else v if v else NO_VALUE
+        return (
+            NO_VALUE if v is NO_VALUE else v[0] if len(v) == 1 else v if v else NO_VALUE
+        )
 
-    def connect(self, listener, error=None, done=None,
-                keep_ref: bool = False) -> "Event":
+    def connect(
+        self, listener, error=None, done=None, keep_ref: bool = False
+    ) -> "Event":
         """
         Connect a listener to this event. If the listener is added multiple
         times then it is invoked just as many times on emit.
@@ -126,7 +142,7 @@ class Event:
             listener.set_source(self)
             return self
         obj, func = self._split(listener)
-        if not keep_ref and hasattr(obj, '__weakref__'):
+        if not keep_ref and hasattr(obj, "__weakref__"):
             ref = weakref.ref(obj, self._onFinalize)
             obj = None
         else:
@@ -154,8 +170,7 @@ class Event:
         """
         obj, func = self._split(listener)
         for slot in self._slots:
-            if (slot[0] is obj or slot[1] and slot[1]() is obj) \
-                    and slot[2] is func:
+            if (slot[0] is obj or slot[1] and slot[1]() is obj) and slot[2] is func:
                 slot[0] = slot[1] = slot[2] = None
                 break
         self._slots = [s for s in self._slots if s != [None, None, None]]
@@ -206,7 +221,7 @@ class Event:
                     else:
                         result = obj(*args)
 
-                if result and hasattr(result, '__await__'):
+                if result and hasattr(result, "__await__"):
                     loop = get_event_loop()
                     asyncio.ensure_future(result, loop=loop)
 
@@ -215,7 +230,8 @@ class Event:
                     self.error_event.emit(self, error)
                 else:
                     Event.logger.exception(
-                        f'Value {args} caused exception for event {self}')
+                        f"Value {args} caused exception for event {self}"
+                    )
 
     def emit_threadsafe(self, *args):
         """
@@ -331,10 +347,10 @@ class Event:
             else:
                 # built-in function
                 return (None, c)
-        elif hasattr(c, '__call__'):
+        elif hasattr(c, "__call__"):
             return (c, None)
         else:
-            raise ValueError(f'Invalid callable: {c}')
+            raise ValueError(f"Invalid callable: {c}")
 
     async def aiter(self, skip_to_last: bool = False, tuples: bool = False):
         """
@@ -359,17 +375,18 @@ class Event:
                 * ``True``: Always yield arguments as a tuple.
                 * ``False``: Unpack single argument tuples.
         """
+
         def on_event(*args):
             if skip_to_last:
                 while q.qsize():
                     q.get_nowait()
-            q.put_nowait(('', args))
+            q.put_nowait(("", args))
 
         def on_error(source, error):
-            q.put_nowait(('ERROR', error))
+            q.put_nowait(("ERROR", error))
 
         def on_done(source):
-            q.put_nowait(('DONE', None))
+            q.put_nowait(("DONE", None))
 
         if self.done():
             return
@@ -379,9 +396,16 @@ class Event:
             while True:
                 what, args = await q.get()
                 if not what:
-                    yield args if tuples else args[0] if len(args) == 1 \
-                        else args if args else NO_VALUE
-                elif what == 'ERROR':
+                    yield (
+                        args
+                        if tuples
+                        else args[0]
+                        if len(args) == 1
+                        else args
+                        if args
+                        else NO_VALUE
+                    )
+                elif what == "ERROR":
                     raise args
                 else:
                     break
@@ -394,7 +418,7 @@ class Event:
     __or__ = pipe
 
     def __repr__(self):
-        return f'Event<{self.name()}, {self._slots}>'
+        return f"Event<{self.name()}, {self._slots}>"
 
     def __len__(self):
         return len(self._slots)
@@ -403,7 +427,7 @@ class Event:
         return True
 
     def __getitem__(self, fork_targets) -> "Fork":
-        if not hasattr(fork_targets, '__iter__'):
+        if not hasattr(fork_targets, "__iter__"):
             fork_targets = (fork_targets,)
         return self.fork(*fork_targets)
 
@@ -420,10 +444,12 @@ class Event:
 
         :meth:`wait` and :meth:`__await__` are each other's inverse.
         """
+
         def on_event(*args):
             if not fut.done():
                 fut.set_result(
-                    args[0] if len(args) == 1 else args if args else NO_VALUE)
+                    args[0] if len(args) == 1 else args if args else NO_VALUE
+                )
 
         def on_error(source, error):
             if not fut.done():
@@ -433,7 +459,7 @@ class Event:
             self.disconnect(on_event, on_error)
 
         if self.done():
-            raise ValueError('Event already done')
+            raise ValueError("Event already done")
         fut = asyncio.Future()
         self.connect(on_event, on_error)
         fut.add_done_callback(on_future_done)
@@ -457,14 +483,16 @@ class Event:
         obj, func = self._split(c)
         return any(
             (s[0] is obj or s[1] and s[1]() is obj) and s[2] is func
-            for s in self._slots)
+            for s in self._slots
+        )
 
     def __reduce__(self):
         """
         Don't pickle slots.
         """
         with_error_done_event = (
-            self.error_event is not None or self.done_event is not None)
+            self.error_event is not None or self.done_event is not None
+        )
         return self.__class__, (self._name, with_error_done_event)
 
     @staticmethod
@@ -493,17 +521,17 @@ class Event:
         """
         if isinstance(obj, Event):
             return obj
-        if hasattr(obj, '__call__'):
+        if hasattr(obj, "__call__"):
             obj = obj()
 
         if isinstance(obj, Event):
             return obj
-        elif hasattr(obj, '__aiter__'):
+        elif hasattr(obj, "__aiter__"):
             return Event.aiterate(obj)
-        elif hasattr(obj, '__await__'):
+        elif hasattr(obj, "__await__"):
             return Event.wait(obj)
         else:
-            raise ValueError(f'Invalid type: {obj}')
+            raise ValueError(f"Invalid type: {obj}")
 
     @staticmethod
     def wait(future: Awaitable) -> "Wait":
@@ -539,8 +567,10 @@ class Event:
 
     @staticmethod
     def sequence(
-            values: Iterable, interval: float = 0,
-            times: Union[Iterable[float], None] = None) -> "Sequence":
+        values: Iterable,
+        interval: float = 0,
+        times: Union[Iterable[float], None] = None,
+    ) -> "Sequence":
         """
         Create a new event that emits the given values.
         Supply at most one ``interval`` or ``times``.
@@ -555,8 +585,11 @@ class Event:
 
     @staticmethod
     def repeat(
-            value=NO_VALUE, count=1, interval: float = 0,
-            times: Union[Iterable[float], None] = None) -> "Repeat":
+        value=NO_VALUE,
+        count=1,
+        interval: float = 0,
+        times: Union[Iterable[float], None] = None,
+    ) -> "Repeat":
         """
         Create a new event that repeats ``value`` a number of ``count`` times.
 
@@ -571,8 +604,8 @@ class Event:
 
     @staticmethod
     def range(
-            *args, interval: float = 0,
-            times: Union[Iterable[float], None] = None) -> "Range":
+        *args, interval: float = 0, times: Union[Iterable[float], None] = None
+    ) -> "Range":
         """
         Create a new event that emits the values from a range.
 
@@ -621,8 +654,8 @@ class Event:
 
     @staticmethod
     def marble(
-            s: str, interval: float = 0,
-            times: Union[Iterable[float], None] = None) -> "Marble":
+        s: str, interval: float = 0, times: Union[Iterable[float], None] = None
+    ) -> "Marble":
         """
         Create a new event that emits the values from a Rx-type marble string.
 
@@ -833,9 +866,7 @@ class Event:
         """
         return Pluck(*selections, source=self)
 
-    def map(
-            self, func, timeout=None, ordered=True,
-            task_limit=None) -> "Map":
+    def map(self, func, timeout=None, ordered=True, task_limit=None) -> "Map":
         """
         Apply a sync or async function to source values using
         positional arguments::
@@ -1005,8 +1036,9 @@ class Event:
         """
         return All(self)
 
-    def ema(self, n: Union[int, None] = None,
-            weight: Union[float, None] = None) -> "Ema":
+    def ema(
+        self, n: Union[int, None] = None, weight: Union[float, None] = None
+    ) -> "Ema":
         """
         Exponential moving average.
 
@@ -1102,8 +1134,7 @@ class Event:
         """
         return Chunk(size, self)
 
-    def chunkwith(
-            self, timer: "Event", emit_empty: bool = True) -> "ChunkWith":
+    def chunkwith(self, timer: "Event", emit_empty: bool = True) -> "ChunkWith":
         """
         Emit a chunked list of values when the timer emits.
 
@@ -1231,8 +1262,7 @@ class Event:
         """
         return Timeout(timeout, self)
 
-    def throttle(
-            self, maximum, interval, cost_func=None) -> "Throttle":
+    def throttle(self, maximum, interval, cost_func=None) -> "Throttle":
         """
         Limit number of emits per time without dropping values.
         Values that come in too fast are queued and re-emitted as soon
@@ -1311,22 +1341,84 @@ class Event:
 
 
 from .ops.aggregate import (
-    All, Any, Count, Deque, Ema, List as ListOp, Max, Mean, Min, Pairwise,
-    Product, Reduce, Sum)
+    All,
+    Any,
+    Count,
+    Deque,
+    Ema,
+    List as ListOp,
+    Max,
+    Mean,
+    Min,
+    Pairwise,
+    Product,
+    Reduce,
+    Sum,
+)
 from .ops.array import (
-    Array, ArrayAll, ArrayAny, ArrayMax, ArrayMean, ArrayMin, ArrayProd,
-    ArrayStd, ArraySum)
+    Array,
+    ArrayAll,
+    ArrayAny,
+    ArrayMax,
+    ArrayMean,
+    ArrayMin,
+    ArrayProd,
+    ArrayStd,
+    ArraySum,
+)
 from .ops.combine import (
-    AddableJoinOp, Chain, Concat, Fork, Merge, Switch, Zip, Ziplatest)
+    AddableJoinOp,
+    Chain,
+    Concat,
+    Fork,
+    Merge,
+    Switch,
+    Zip,
+    Ziplatest,
+)
 from .ops.create import (
-    Aiterate, Marble, Range, Repeat, Sequence, Timer, Timerange, Wait)
+    Aiterate,
+    Marble,
+    Range,
+    Repeat,
+    Sequence,
+    Timer,
+    Timerange,
+    Wait,
+)
 from .ops.misc import EndOnError, Errors
 from .ops.op import Op
 from .ops.select import (
-    Changes, DropWhile, Filter, Last, Skip, Take, TakeUntil, TakeWhile, Unique)
-from .ops.timing import (
-    Debounce, Delay, Sample, Throttle, Timeout)
+    Changes,
+    DropWhile,
+    Filter,
+    Last,
+    Skip,
+    Take,
+    TakeUntil,
+    TakeWhile,
+    Unique,
+)
+from .ops.timing import Debounce, Delay, Sample, Throttle, Timeout
 from .ops.transform import (
-    Chainmap, Chunk, ChunkWith, Concatmap, Constant, Copy, Deepcopy, Emap,
-    Enumerate, Iterate, Map, Mergemap, Pack, Partial, PartialRight, Pluck,
-    Previous, Star, Switchmap, Timestamp)
+    Chainmap,
+    Chunk,
+    ChunkWith,
+    Concatmap,
+    Constant,
+    Copy,
+    Deepcopy,
+    Emap,
+    Enumerate,
+    Iterate,
+    Map,
+    Mergemap,
+    Pack,
+    Partial,
+    PartialRight,
+    Pluck,
+    Previous,
+    Star,
+    Switchmap,
+    Timestamp,
+)

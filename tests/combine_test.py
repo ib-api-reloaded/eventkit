@@ -8,13 +8,11 @@ array3 = list(range(200, 210))
 
 
 class CombineTest(unittest.TestCase):
-
     def test_merge(self):
         e1 = Event.sequence(array1, interval=0.01)
         e2 = Event.sequence(array2, interval=0.01).delay(0.001)
         event = e1.merge(e2)
-        self.assertEqual(event.run(), [
-            i for j in zip(array1, array2) for i in j])
+        self.assertEqual(event.run(), [i for j in zip(array1, array2) for i in j])
 
     def test_switch(self):
         e1 = Event.sequence(array1, interval=0.01)
@@ -27,8 +25,9 @@ class CombineTest(unittest.TestCase):
         e1 = Event.sequence(array1, interval=0.02)
         e2 = Event.sequence(array2, interval=0.02).delay(0.07)
         event = e1.concat(e2)
-        self.assertEqual(event.run(), [
-            0, 1, 2, 3, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109])
+        self.assertEqual(
+            event.run(), [0, 1, 2, 3, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109]
+        )
 
     def test_chain(self):
         e1 = Event.sequence(array1, interval=0.01)
@@ -51,5 +50,4 @@ class CombineTest(unittest.TestCase):
         e1 = Event.sequence([0, 1], interval=0.01)
         e2 = Event.sequence([2, 3], interval=0.01).delay(0.001)
         event = e1.ziplatest(e2)
-        self.assertEqual(
-            event.run(), [(0, Event.NO_VALUE), (0, 2), (1, 2), (1, 3)])
+        self.assertEqual(event.run(), [(0, Event.NO_VALUE), (0, 2), (1, 2), (1, 3)])

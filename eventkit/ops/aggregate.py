@@ -16,7 +16,7 @@ class Count(Iterate):
 
 
 class Reduce(Op):
-    __slots__ = ('_func', '_initializer', '_prev')
+    __slots__ = ("_func", "_initializer", "_prev")
 
     def __init__(self, func, initializer=NO_VALUE, source=None):
         Op.__init__(self, source)
@@ -40,14 +40,14 @@ class Min(Reduce):
     __slots__ = ()
 
     def __init__(self, source=None):
-        Reduce.__init__(self, min, float('inf'), source)
+        Reduce.__init__(self, min, float("inf"), source)
 
 
 class Max(Reduce):
     __slots__ = ()
 
     def __init__(self, source=None):
-        Reduce.__init__(self, max, -float('inf'), source)
+        Reduce.__init__(self, max, -float("inf"), source)
 
 
 class Sum(Reduce):
@@ -65,7 +65,7 @@ class Product(Reduce):
 
 
 class Mean(Op):
-    __slots__ = ('_count', '_sum')
+    __slots__ = ("_count", "_sum")
 
     def __init__(self, source=None):
         Op.__init__(self, source)
@@ -93,7 +93,7 @@ class All(Reduce):
 
 
 class Ema(Op):
-    __slots__ = ('_f1', '_f2', '_prev')
+    __slots__ = ("_f1", "_f2", "_prev")
 
     def __init__(self, n=None, weight=None, source=None):
         Op.__init__(self, source)
@@ -105,14 +105,13 @@ class Ema(Op):
         if self._prev is NO_VALUE:
             value = args
         else:
-            value = [
-                self._f2 * p + self._f1 * a for p, a in zip(self._prev, args)]
+            value = [self._f2 * p + self._f1 * a for p, a in zip(self._prev, args)]
         self._prev = value
         self.emit(*value)
 
 
 class Pairwise(Op):
-    __slots__ = ('_prev', '_has_prev')
+    __slots__ = ("_prev", "_has_prev")
 
     def __init__(self, source=None):
         Op.__init__(self, source)
@@ -128,15 +127,14 @@ class Pairwise(Op):
 
 
 class List(Op):
-    __slots__ = ('_values')
+    __slots__ = "_values"
 
     def __init__(self, source=None):
         Op.__init__(self, source)
         self._values = []
 
     def on_source(self, *args):
-        self._values.append(
-            args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._values.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
 
     def on_source_done(self, source):
         self.emit(self._values)
@@ -144,7 +142,7 @@ class List(Op):
 
 
 class Deque(Op):
-    __slots__ = ('_count', '_q')
+    __slots__ = ("_count", "_q")
 
     def __init__(self, count, source=None):
         Op.__init__(self, source)
@@ -152,8 +150,7 @@ class Deque(Op):
         self._q = deque()
 
     def on_source(self, *args):
-        self._q.append(
-            args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._q.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
         if self._count and len(self._q) > self._count:
             self._q.popleft()
         self.emit(self._q)

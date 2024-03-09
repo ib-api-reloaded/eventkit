@@ -6,7 +6,6 @@ array = list(range(10))
 
 
 class AggregateTest(unittest.TestCase):
-
     def test_min(self):
         event = Event.sequence(array).min()
         self.assertEqual(event.run(), [0] * 10)
@@ -17,18 +16,17 @@ class AggregateTest(unittest.TestCase):
 
     def test_sum(self):
         event = Event.sequence(array).sum()
-        self.assertEqual(event.run(), [
-            0, 1, 3, 6, 10, 15, 21, 28, 36, 45])
+        self.assertEqual(event.run(), [0, 1, 3, 6, 10, 15, 21, 28, 36, 45])
 
     def test_product(self):
         event = Event.sequence(array[1:]).product()
-        self.assertEqual(event.run(), [
-            1, 2, 6, 24, 120, 720, 5040, 40320, 362880])
+        self.assertEqual(event.run(), [1, 2, 6, 24, 120, 720, 5040, 40320, 362880])
 
     def test_any(self):
         event = Event.sequence(array).any()
-        self.assertEqual(event.run(), [
-            False, True, True, True, True, True, True, True, True, True])
+        self.assertEqual(
+            event.run(), [False, True, True, True, True, True, True, True, True, True]
+        )
 
     def test_all(self):
         x = [True] * 10 + [False] * 10

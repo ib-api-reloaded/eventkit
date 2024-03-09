@@ -8,9 +8,9 @@ from ..util import NO_VALUE, get_event_loop, timerange
 
 
 class Wait(Event):
-    __slots__ = ('_task',)
+    __slots__ = ("_task",)
 
-    def __init__(self, future, name='wait'):
+    def __init__(self, future, name="wait"):
         Event.__init__(self, name)
         if future.done():
             self._task = None
@@ -36,7 +36,7 @@ class Wait(Event):
 
 
 class Aiterate(Event):
-    __slots__ = ('_task',)
+    __slots__ = ("_task",)
 
     def __init__(self, ait):
         Event.__init__(self, ait.__qualname__)
@@ -73,6 +73,7 @@ class Sequence(Aiterate):
                     delay = max(0, i * interval + t0 - time.time())
                     await asyncio.sleep(delay)
                     yield value
+
         Aiterate.__init__(self, sequence())
 
 
@@ -109,6 +110,7 @@ class Timer(Aiterate):
                 delay = i * interval + t0 - time.time()
                 await asyncio.sleep(delay)
                 yield i * interval
+
         Aiterate.__init__(self, timer())
 
 
@@ -116,8 +118,10 @@ class Marble(Op):
     __slots__ = ()
 
     def __init__(self, s, interval=0, times=None):
-        s = s.replace('_', '')
-        source = Event.sequence(s, interval, times) \
-            .filter(lambda c: c not in '- ') \
-            .takewhile(lambda c: c != '|')
+        s = s.replace("_", "")
+        source = (
+            Event.sequence(s, interval, times)
+            .filter(lambda c: c not in "- ")
+            .takewhile(lambda c: c != "|")
+        )
         Op.__init__(self, source)

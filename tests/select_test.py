@@ -6,7 +6,6 @@ array = list(range(10))
 
 
 class SelectTest(unittest.TestCase):
-
     def test_select(self):
         event = Event.sequence(array).filter(lambda x: x % 2)
         self.assertEqual(event.run(), [x for x in array if x % 2])

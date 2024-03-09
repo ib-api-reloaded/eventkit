@@ -9,7 +9,7 @@ from ..util import NO_VALUE, get_event_loop
 
 
 class Constant(Op):
-    __slots__ = ('_constant',)
+    __slots__ = ("_constant",)
 
     def __init__(self, constant, source=None):
         Op.__init__(self, source)
@@ -20,7 +20,7 @@ class Constant(Op):
 
 
 class Iterate(Op):
-    __slots__ = ('_it',)
+    __slots__ = ("_it",)
 
     def __init__(self, it, source=None):
         Op.__init__(self, source)
@@ -36,7 +36,7 @@ class Iterate(Op):
 
 
 class Enumerate(Op):
-    __slots__ = ('_step', '_i')
+    __slots__ = ("_step", "_i")
 
     def __init__(self, start=0, step=1, source=None):
         Op.__init__(self, source)
@@ -44,9 +44,7 @@ class Enumerate(Op):
         self._step = step
 
     def on_source(self, *args):
-        self.emit(
-            self._i,
-            args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self.emit(self._i, args[0] if len(args) == 1 else args if args else NO_VALUE)
         self._i += self._step
 
 
@@ -55,12 +53,12 @@ class Timestamp(Op):
 
     def on_source(self, *args):
         self.emit(
-            time.time(),
-            args[0] if len(args) == 1 else args if args else NO_VALUE)
+            time.time(), args[0] if len(args) == 1 else args if args else NO_VALUE
+        )
 
 
 class Partial(Op):
-    __slots__ = ('_left_args',)
+    __slots__ = ("_left_args",)
 
     def __init__(self, *left_args, source=None):
         Op.__init__(self, source)
@@ -71,7 +69,7 @@ class Partial(Op):
 
 
 class PartialRight(Op):
-    __slots__ = ('_right_args',)
+    __slots__ = ("_right_args",)
 
     def __init__(self, *right_args, source=None):
         Op.__init__(self, source)
@@ -96,7 +94,7 @@ class Pack(Op):
 
 
 class Pluck(Op):
-    __slots__ = ('_selections',)
+    __slots__ = ("_selections",)
 
     def __init__(self, *selections, source=None):
         Op.__init__(self, source)
@@ -105,10 +103,10 @@ class Pluck(Op):
             if type(sel) is int:
                 s = [sel]
             else:
-                s = sel.split('.')
+                s = sel.split(".")
                 if s[0].isdigit():
                     s[0] = int(s[0])
-                elif s[0] == '':
+                elif s[0] == "":
                     s[0] = 0
                 else:
                     s.insert(0, 0)
@@ -128,7 +126,7 @@ class Pluck(Op):
 
 
 class Previous(Op):
-    __slots__ = ('_count', '_q')
+    __slots__ = ("_count", "_q")
 
     def __init__(self, count=1, source=None):
         Op.__init__(self, source)
@@ -156,7 +154,7 @@ class Deepcopy(Op):
 
 
 class Chunk(Op):
-    __slots__ = ('_size', '_list')
+    __slots__ = ("_size", "_list")
 
     def __init__(self, size, source=None):
         Op.__init__(self, source)
@@ -164,8 +162,7 @@ class Chunk(Op):
         self._list = []
 
     def on_source(self, *args):
-        self._list.append(
-            args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._list.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
         if len(self._list) == self._size:
             self.emit(self._list)
             self._list = []
@@ -177,21 +174,17 @@ class Chunk(Op):
 
 
 class ChunkWith(Op):
-    __slots__ = ('_timer', '_list', '_emit_empty')
+    __slots__ = ("_timer", "_list", "_emit_empty")
 
     def __init__(self, timer, emit_empty, source=None):
         Op.__init__(self, source)
         self._timer = timer
         self._emit_empty = emit_empty
         self._list = []
-        timer.connect(
-            self._on_timer,
-            self.on_source_error,
-            self.on_source_done)
+        timer.connect(self._on_timer, self.on_source_error, self.on_source_done)
 
     def on_source(self, *args):
-        self._list.append(
-            args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._list.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
 
     def _on_timer(self, *args):
         if self._list or self._emit_empty:
@@ -204,19 +197,16 @@ class ChunkWith(Op):
             self._list = None
         if self._timer is not None:
             self._timer.disconnect(
-                self._on_timer,
-                self.on_source_error,
-                self.on_source_done)
+                self._on_timer, self.on_source_error, self.on_source_done
+            )
             self._timer = None
         Op.on_source_done(self, self._source)
 
 
 class Map(Op):
-    __slots__ = (
-        '_func', '_timeout', '_ordered', '_task_limit', '_coro_q', '_tasks')
+    __slots__ = ("_func", "_timeout", "_ordered", "_task_limit", "_coro_q", "_tasks")
 
-    def __init__(
-            self, func, timeout=0, ordered=True, task_limit=None, source=None):
+    def __init__(self, func, timeout=0, ordered=True, task_limit=None, source=None):
         Op.__init__(self, source)
         if source is not None and source.done():
             return
@@ -229,7 +219,7 @@ class Map(Op):
 
     def on_source(self, *args):
         obj = self._func(*args)
-        if hasattr(obj, '__await__'):
+        if hasattr(obj, "__await__"):
             # function returns an awaitable
             if not self._task_limit or len(self._tasks) < self._task_limit:
                 # schedule right away
@@ -271,8 +261,7 @@ class Map(Op):
             tasks.remove(task)
 
         # schedule pending awaitables from the queue
-        while self._coro_q and (
-                not self._task_limit or len(tasks) < self._task_limit):
+        while self._coro_q and (not self._task_limit or len(tasks) < self._task_limit):
             self._create_task(self._coro_q.popleft())
 
         # end when source has ended with no pending tasks
@@ -289,17 +278,17 @@ class Map(Op):
 
 
 class Emap(Op):
-    __slots__ = ('_constr', '_joiner',)
+    __slots__ = (
+        "_constr",
+        "_joiner",
+    )
 
     def __init__(self, constr, joiner, source=None):
         Op.__init__(self, source)
         self._constr = constr
         self._joiner = joiner
         joiner.set_parent(source)
-        joiner.connect(
-            self.emit,
-            self.error_event.emit,
-            self._on_joiner_done)
+        joiner.connect(self.emit, self.error_event.emit, self._on_joiner_done)
 
     def on_source(self, *args):
         obj = self._constr(*args)
@@ -310,10 +299,7 @@ class Emap(Op):
         pass
 
     def _on_joiner_done(self, joiner):
-        joiner.disconnect(
-            self.emit,
-            self.error_event.emit,
-            self._on_joiner_done)
+        joiner.disconnect(self.emit, self.error_event.emit, self._on_joiner_done)
         self._joiner = None
         self.set_done()
 

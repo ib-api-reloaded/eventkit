@@ -10,7 +10,6 @@ loop = asyncio.get_event_loop_policy().get_event_loop()
 
 
 class CreateTest(unittest.TestCase):
-
     def test_wait(self):
         fut = asyncio.Future(loop=loop)
         loop.call_later(0.001, fut.set_result, 42)
@@ -22,10 +21,11 @@ class CreateTest(unittest.TestCase):
             await asyncio.sleep(0)
             for i in array1:
                 yield i
+
         event = Event.aiterate(ait())
         self.assertEqual(event.run(), array1)
 
     def test_marble(self):
-        s = '   a b c   d e f'
+        s = "   a b c   d e f"
         event = Event.marble(s, interval=0.001)
-        self.assertEqual(event.run(), [c for c in 'abcdef'])
+        self.assertEqual(event.run(), [c for c in "abcdef"])

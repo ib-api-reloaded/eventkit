@@ -9,7 +9,6 @@ run = loop.run_until_complete
 
 
 class Object:
-
     def __init__(self):
         self.value = 0
 
@@ -27,11 +26,10 @@ async def ait(it):
 
 
 class EventTest(unittest.TestCase):
-
     def test_functor(self):
         obj1 = Object()
         obj2 = Object()
-        event = Event('test')
+        event = Event("test")
         event += obj1
         event.emit(9, 4)
         self.assertEqual(obj1.value, 5)
@@ -49,7 +47,7 @@ class EventTest(unittest.TestCase):
     def test_method(self):
         obj1 = Object()
         obj2 = Object()
-        event = Event('test')
+        event = Event("test")
         event += obj1.method
         event.emit(9, 4)
         self.assertEqual(obj1.value, 5)
@@ -78,9 +76,10 @@ class EventTest(unittest.TestCase):
         def f2(x, y):
             nonlocal value2
             value2 += x - y
+
         value1 = 0
         value2 = 0
-        event = Event('test')
+        event = Event("test")
         event += f1
         event.emit(9, 4)
         self.assertEqual(value1, 5)
@@ -96,14 +95,16 @@ class EventTest(unittest.TestCase):
 
     def test_cmethod(self):
         import math
-        event = Event('test')
+
+        event = Event("test")
         event += math.pow
         event.emit(2, 8)
 
     def test_keep_ref(self):
         import weakref
+
         obj = Object()
-        event = Event('test')
+        event = Event("test")
         event.connect(obj.method, keep_ref=True)
         wr = weakref.ref(obj)
         del obj
@@ -122,7 +123,7 @@ class EventTest(unittest.TestCase):
             await asyncio.sleep(0)
 
         result = []
-        event = Event('test')
+        event = Event("test")
         event += coro
 
         event.emit(4)
@@ -147,9 +148,10 @@ class EventTest(unittest.TestCase):
 
     def test_fork(self):
         event = Event.range(4, 10)[ev.Min, ev.Max, ev.Op().sum()].zip()
-        self.assertEqual(event.run(), [
-            (4, 4, 4), (4, 5, 9), (4, 6, 15), (4, 7, 22),
-            (4, 8, 30), (4, 9, 39)])
+        self.assertEqual(
+            event.run(),
+            [(4, 4, 4), (4, 5, 9), (4, 6, 15), (4, 7, 22), (4, 8, 30), (4, 9, 39)],
+        )
 
     def test_operator_connect(self):
         result = []

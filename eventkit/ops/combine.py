@@ -43,7 +43,7 @@ class JoinOp(Op):
     from multiple source events.
     """
 
-    __slots__ = ('_sources',)
+    __slots__ = ("_sources",)
 
     _sources: Deque[Event]
 
@@ -57,7 +57,7 @@ class AddableJoinOp(JoinOp):
     parent higher-order event, can be added dynamically.
     """
 
-    __slots__ = ('_parent',)
+    __slots__ = ("_parent",)
 
     _parent: Optional[Event]
 
@@ -103,7 +103,7 @@ class Merge(AddableJoinOp):
 
 
 class Switch(AddableJoinOp):
-    __slots__ = ('_source2cb', '_active_source')
+    __slots__ = ("_source2cb", "_active_source")
 
     def __init__(self, *sources):
         AddableJoinOp.__init__(self)
@@ -140,7 +140,7 @@ class Switch(AddableJoinOp):
 
 
 class Concat(AddableJoinOp):
-    __slots__ = ('_source2cb',)
+    __slots__ = ("_source2cb",)
 
     def __init__(self, *sources):
         AddableJoinOp.__init__(self)
@@ -175,7 +175,7 @@ class Concat(AddableJoinOp):
 
 
 class Chain(AddableJoinOp):
-    __slots__ = ('_qq', '_source2cbs')
+    __slots__ = ("_qq", "_source2cbs")
 
     def __init__(self, *sources):
         AddableJoinOp.__init__(self)
@@ -187,8 +187,10 @@ class Chain(AddableJoinOp):
         if not self._sources:
             self._connect_from(source)
         else:
+
             def cb(*args):
                 q.append(args)
+
             q = deque()
             self._qq.append(q)
             source += cb
@@ -217,7 +219,7 @@ class Chain(AddableJoinOp):
 
 
 class Zip(JoinOp):
-    __slots__ = ('_results', '_source2cbs', '_num_ready')
+    __slots__ = ("_results", "_source2cbs", "_num_ready")
 
     def __init__(self, *sources):
         JoinOp.__init__(self)
@@ -255,14 +257,13 @@ class Zip(JoinOp):
         if not self._sources:
             for source, cbs in self._source2cbs.items():
                 for cb in cbs:
-                    source.disconnect(
-                        cb, self.on_source_error, self.on_source_done)
+                    source.disconnect(cb, self.on_source_error, self.on_source_done)
             self._source2cbs = None
             self.set_done()
 
 
 class Ziplatest(JoinOp):
-    __slots__ = ('_values', '_is_primed', '_source2cbs')
+    __slots__ = ("_values", "_is_primed", "_source2cbs")
 
     def __init__(self, *sources, partial=True):
         JoinOp.__init__(self)
@@ -284,8 +285,7 @@ class Ziplatest(JoinOp):
             self._source2cbs[source].append(cb)
 
     def _on_source_i(self, i, *args):
-        self._values[i] = \
-            args[0] if len(args) == 1 else args if args else NO_VALUE
+        self._values[i] = args[0] if len(args) == 1 else args if args else NO_VALUE
         if not self._is_primed:
             self._is_primed = not any(r is NO_VALUE for r in self._values)
         if self._is_primed:
@@ -296,7 +296,6 @@ class Ziplatest(JoinOp):
         if not self._sources:
             for source, cbs in self._source2cbs.items():
                 for cb in cbs:
-                    source.disconnect(
-                        cb, self.on_source_error, self.on_source_done)
+                    source.disconnect(cb, self.on_source_error, self.on_source_done)
             self._source2cbs = None
             self.set_done()

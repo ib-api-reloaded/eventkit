@@ -3,7 +3,7 @@ from ..event import Event
 
 
 class Errors(Event):
-    __slots__ = ('_source',)
+    __slots__ = ("_source",)
 
     def __init__(self, source=None):
         Event.__init__(self)

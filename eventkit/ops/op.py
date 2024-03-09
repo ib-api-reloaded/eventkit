@@ -51,13 +51,8 @@ class Op(Event):
             self.set_done()
         else:
             source.connect(
-                self.on_source,
-                self.on_source_error,
-                self.on_source_done,
-                keep_ref=True)
+                self.on_source, self.on_source_error, self.on_source_done, keep_ref=True
+            )
 
     def _disconnect_from(self, source: Event):
-        source.disconnect(
-            self.on_source,
-            self.on_source_error,
-            self.on_source_done)
+        source.disconnect(self.on_source, self.on_source_error, self.on_source_done)
