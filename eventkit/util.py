@@ -21,9 +21,6 @@ def get_event_loop():
     return asyncio.get_event_loop_policy().get_event_loop()
 
 
-main_event_loop = get_event_loop()
-
-
 async def timerange(start=0, end=None, step: float = 1) -> AsyncIterator[dt.datetime]:
     """
     Iterator that waits periodically until certain time points are
