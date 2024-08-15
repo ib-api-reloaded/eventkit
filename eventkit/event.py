@@ -15,7 +15,7 @@ from typing import (
     Union,
 )
 
-from .util import NO_VALUE, get_event_loop, main_event_loop
+from .util import NO_VALUE, get_event_loop
 
 
 class Event:
@@ -240,7 +240,7 @@ class Event:
         Threadsafe version of :meth:`emit` that doesn't invoke the
         listeners directly but via the event loop of the main thread.
         """
-        main_event_loop.call_soon_threadsafe(self.emit, *args)
+        get_event_loop().call_soon_threadsafe(self.emit, *args)
 
     def clear(self):
         """
