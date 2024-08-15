@@ -4,6 +4,8 @@ import types
 import weakref
 from typing import (
     Any as AnyType,
+)
+from typing import (
     AsyncIterable,
     Awaitable,
     Iterable,
@@ -1346,7 +1348,6 @@ from .ops.aggregate import (
     Count,
     Deque,
     Ema,
-    List as ListOp,
     Max,
     Mean,
     Min,
@@ -1354,6 +1355,9 @@ from .ops.aggregate import (
     Product,
     Reduce,
     Sum,
+)
+from .ops.aggregate import (
+    List as ListOp,
 )
 from .ops.array import (
     Array,

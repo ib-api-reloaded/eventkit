@@ -15,3 +15,4 @@ docs/doctrees
 eventkit.egg-info
 dist/
 poetry.lock
+.python-version

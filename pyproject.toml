@@ -5,8 +5,8 @@ description = "Event-driven data pipelines"
 authors = ["Ewald R. de Wit"]
 license = "BSD"
 readme = "README.rst"
-homepage = "https://github.com/erdewit/eventkit"
-repository = "https://github.com/erdewit/eventkit"
+homepage = "https://github.com/ib-api-reloaded/eventkit"
+repository = "https://github.com/ib-api-reloaded/eventkit"
 keywords = ["python", "asyncio", "event", "driven", "data", "pipelines"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -28,10 +28,33 @@ python = "^3.8"
 numpy = "*"
 
 [tool.poetry.dev-dependencies]
+ruff = "^0.5.7"
+pre-commit = "^3.5.0"
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/ib-api-reloaded/eventkit/issues"
+
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.flake8]
-ignore = ["D100", "D101", "D102", "D105", "D107", "D200", "D205", "D400", "D401", "D402", "E402", "F401", "I100", "I102", "I202", "W503"]
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = [
+    "D100",
+    "D101",
+    "D102",
+    "D105",
+    "D107",
+    "D200",
+    "D205",
+    "D400",
+    "D401",
+    "D402",
+    "E402",
+    "F401",
+]

@@ -2,9 +2,9 @@ import functools
 from collections import defaultdict, deque
 from typing import Deque, Optional
 
-from .op import Op
 from ..event import Event
 from ..util import NO_VALUE
+from .op import Op
 
 
 class Fork(list):

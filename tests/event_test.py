@@ -1,8 +1,8 @@
 import asyncio
 import unittest
 
-from eventkit import Event
 import eventkit as ev
+from eventkit import Event
 
 loop = asyncio.get_event_loop_policy().get_event_loop()
 run = loop.run_until_complete

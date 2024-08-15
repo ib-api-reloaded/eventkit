@@ -2,9 +2,9 @@ import asyncio
 import itertools
 import time
 
-from .op import Op
 from ..event import Event
 from ..util import NO_VALUE, get_event_loop, timerange
+from .op import Op
 
 
 class Wait(Event):

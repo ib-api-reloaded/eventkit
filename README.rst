@@ -13,7 +13,7 @@ with familiar names from Python and its libraries where possible.
 For scheduling asyncio is used and there is seamless integration with it.
 
 See the examples and the
-`introduction notebook <https://github.com/erdewit/eventkit/tree/master/notebooks/eventkit_introduction.ipynb>`_
+`introduction notebook <https://github.com/ib-api-reloaded/eventkit/tree/main/notebooks/eventkit_introduction.ipynb>`_
 to get a true feel for the possibilities.
 
 Installation
@@ -182,5 +182,3 @@ The complete `API documentation <https://eventkit.readthedocs.io/en/latest/api.h
 .. |Docs| image:: https://readthedocs.org/projects/eventkit/badge/?version=latest
    :alt: Documentation
    :target: https://eventkit.readthedocs.io
-
-

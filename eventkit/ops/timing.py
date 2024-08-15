@@ -1,8 +1,8 @@
 from collections import deque
 
-from .op import Op
 from ..event import Event
 from ..util import NO_VALUE, get_event_loop
+from .op import Op
 
 
 class Delay(Op):

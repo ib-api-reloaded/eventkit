@@ -1,5 +1,5 @@
-import unittest
 import asyncio
+import unittest
 from collections import namedtuple
 
 import numpy as np

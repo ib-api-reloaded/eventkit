@@ -1,5 +1,5 @@
-from .op import Op
 from ..event import Event
+from .op import Op
 
 
 class Errors(Event):

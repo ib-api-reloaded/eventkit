@@ -1,5 +1,5 @@
-from .op import Op
 from ..util import NO_VALUE
+from .op import Op
 
 
 class Filter(Op):

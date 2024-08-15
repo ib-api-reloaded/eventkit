@@ -2,8 +2,8 @@ from collections import deque
 
 import numpy as np
 
-from .op import Op
 from ..util import NO_VALUE
+from .op import Op
 
 
 class Array(Op):

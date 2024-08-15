@@ -2,9 +2,9 @@ import itertools
 import operator
 from collections import deque
 
+from ..util import NO_VALUE
 from .op import Op
 from .transform import Iterate
-from ..util import NO_VALUE
 
 
 class Count(Iterate):
