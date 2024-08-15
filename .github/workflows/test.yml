@@ -19,12 +19,13 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 mypy pytest .
+          pip install ruff mypy pytest .
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Flake8 static code analysis
         run:
-          flake8 eventkit
+          ruff check eventkit/
+          ruff format eventkit/
 
       - name: MyPy static code analysis
         run: |
