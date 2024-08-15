@@ -13,3 +13,5 @@ docs/html/.buildinfo
 docs/html/.doctrees
 docs/doctrees
 eventkit.egg-info
+dist/
+poetry.lock
