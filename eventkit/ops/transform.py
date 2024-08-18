@@ -3,7 +3,7 @@ import copy
 import time
 from collections import deque
 
-from ..util import NO_VALUE, get_event_loop
+from ..util import NO_VALUE
 from .combine import Chain, Concat, Merge, Switch
 from .op import Op
 
@@ -110,6 +110,7 @@ class Pluck(Op):
                     s[0] = 0
                 else:
                     s.insert(0, 0)
+
             self._selections.append(s)
 
     def on_source(self, *args):
@@ -121,7 +122,9 @@ class Pluck(Op):
                     value = getattr(value, attr)
             except Exception:
                 value = NO_VALUE
+
             values.append(value)
+
         self.emit(*values)
 
 
@@ -170,6 +173,7 @@ class Chunk(Op):
     def on_source_done(self, source):
         if self._list:
             self.emit(self._list)
+
         Op.on_source_done(self, self._source)
 
 
@@ -195,11 +199,13 @@ class ChunkWith(Op):
         if self._list:
             self.emit(self._list)
             self._list = None
+
         if self._timer is not None:
             self._timer.disconnect(
                 self._on_timer, self.on_source_error, self.on_source_done
             )
             self._timer = None
+
         Op.on_source_done(self, self._source)
 
 
@@ -210,6 +216,7 @@ class Map(Op):
         Op.__init__(self, source)
         if source is not None and source.done():
             return
+
         self._func = func
         self._timeout = timeout
         self._ordered = ordered
@@ -219,7 +226,7 @@ class Map(Op):
 
     def on_source(self, *args):
         obj = self._func(*args)
-        if hasattr(obj, "__await__"):
+        if asyncio.iscoroutine(obj):
             # function returns an awaitable
             if not self._task_limit or len(self._tasks) < self._task_limit:
                 # schedule right away
@@ -235,14 +242,15 @@ class Map(Op):
         if not self._tasks:
             # only end when no tasks are pending
             Op.on_source_done(self, self._source)
+
         self._source = None
 
     def _create_task(self, coro):
         # schedule a task to be run
         if self._timeout:
             coro = asyncio.wait_for(coro, self._timeout)
-        loop = get_event_loop()
-        task = asyncio.ensure_future(coro, loop=loop)
+
+        task = asyncio.create_task(coro)
         task.add_done_callback(self._on_task_done)
         self._tasks.append(task)
 

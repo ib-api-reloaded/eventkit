@@ -56,14 +56,17 @@ class Event:
         Sub event that emits errors from this event as
         ``emit(source, exception)``.
         """
+
         self.done_event = None
         """
         Sub event that emits when this event is done as
         ``emit(source)``.
         """
+
         if _with_error_done_events:
             self.error_event = Event("error", False)
             self.done_event = Event("done", False)
+
         self._slots = []  # list of [obj, weakref, func] sublists
         self._name = name or self.__class__.__qualname__
         self._value = NO_VALUE
@@ -97,6 +100,7 @@ class Event:
         This event's last emitted value.
         """
         v = self._value
+
         return (
             NO_VALUE if v is NO_VALUE else v[0] if len(v) == 1 else v if v else NO_VALUE
         )
@@ -143,18 +147,23 @@ class Event:
             # let the operator connect itself to this event
             listener.set_source(self)
             return self
+
         obj, func = self._split(listener)
         if not keep_ref and hasattr(obj, "__weakref__"):
             ref = weakref.ref(obj, self._onFinalize)
             obj = None
         else:
             ref = None
+
         slot = [obj, ref, func]
         self._slots.append(slot)
+
         if self.done_event and done is not None:
             self.done_event.connect(done)
+
         if self.error_event and error is not None:
             self.error_event.connect(error)
+
         return self
 
     def disconnect(self, listener, error=None, done=None):
@@ -175,11 +184,15 @@ class Event:
             if (slot[0] is obj or slot[1] and slot[1]() is obj) and slot[2] is func:
                 slot[0] = slot[1] = slot[2] = None
                 break
+
         self._slots = [s for s in self._slots if s != [None, None, None]]
+
         if error is not None:
             self.error_event.disconnect(error)
+
         if done is not None:
             self.done_event.disconnect(done)
+
         return self
 
     def disconnect_obj(self, obj):
@@ -194,9 +207,12 @@ class Event:
         for slot in self._slots:
             if slot[0] is obj or slot[1] and slot[1]() is obj:
                 slot[0] = slot[1] = slot[2] = None
+
         self._slots = [s for s in self._slots if s != [None, None, None]]
+
         if self.error_event is not None:
             self.error_event.disconnect_obj(obj)
+
         if self.done_event is not None:
             self.done_event.disconnect_obj(obj)
 
@@ -208,6 +224,7 @@ class Event:
             args: Argument values to emit to listeners.
         """
         self._value = args
+
         for obj, ref, func in self._slots.copy():
             try:
                 if ref:
@@ -223,10 +240,10 @@ class Event:
                     else:
                         result = obj(*args)
 
+                # even though asyncio.iscoroutine() would also work here,
+                # this manual hasattr() check performs better.
                 if result and hasattr(result, "__await__"):
-                    loop = get_event_loop()
-                    asyncio.ensure_future(result, loop=loop)
-
+                    asyncio.ensure_future(result, loop=get_event_loop())
             except Exception as error:
                 if len(self.error_event):
                     self.error_event.emit(self, error)
@@ -248,6 +265,7 @@ class Event:
         """
         for slot in self._slots:
             slot[0] = slot[1] = slot[2] = None
+
         self._slots = []
 
     def run(self) -> List:
@@ -297,6 +315,7 @@ class Event:
             t = Event.create(t)
             t.set_source(source)
             source = t
+
         return source
 
     def fork(self, *targets: "Event") -> "Fork":
@@ -322,6 +341,7 @@ class Event:
             t = Event.create(t)
             t.set_source(self)
             fork.append(t)
+
         return fork
 
     def set_source(self, source):
@@ -331,6 +351,7 @@ class Event:
         for slot in self._slots:
             if slot[1] is ref:
                 slot[0] = slot[1] = slot[2] = None
+
         self._slots = [s for s in self._slots if s != [None, None, None]]
 
     @staticmethod
@@ -340,19 +361,22 @@ class Event:
         """
         if isinstance(c, types.FunctionType):
             return (None, c)
-        elif isinstance(c, types.MethodType):
+
+        if isinstance(c, types.MethodType):
             return (c.__self__, c.__func__)
-        elif isinstance(c, types.BuiltinMethodType):
+
+        if isinstance(c, types.BuiltinMethodType):
             if type(c.__self__) is type:
                 # built-in method
                 return (c.__self__, c)
             else:
                 # built-in function
                 return (None, c)
-        elif hasattr(c, "__call__"):
+
+        if hasattr(c, "__call__"):
             return (c, None)
-        else:
-            raise ValueError(f"Invalid callable: {c}")
+
+        raise ValueError(f"Invalid callable: {c}")
 
     async def aiter(self, skip_to_last: bool = False, tuples: bool = False):
         """
@@ -392,6 +416,7 @@ class Event:
 
         if self.done():
             return
+
         q: asyncio.Queue[Tuple[str, AnyType]] = asyncio.Queue()
         self.connect(on_event, on_error, on_done)
         try:
@@ -431,6 +456,7 @@ class Event:
     def __getitem__(self, fork_targets) -> "Fork":
         if not hasattr(fork_targets, "__iter__"):
             fork_targets = (fork_targets,)
+
         return self.fork(*fork_targets)
 
     def __await__(self):
@@ -462,6 +488,7 @@ class Event:
 
         if self.done():
             raise ValueError("Event already done")
+
         fut = asyncio.Future()
         self.connect(on_event, on_error)
         fut.add_done_callback(on_future_done)
@@ -523,17 +550,20 @@ class Event:
         """
         if isinstance(obj, Event):
             return obj
+
         if hasattr(obj, "__call__"):
             obj = obj()
 
         if isinstance(obj, Event):
             return obj
-        elif hasattr(obj, "__aiter__"):
+
+        if hasattr(obj, "__aiter__"):
             return Event.aiterate(obj)
-        elif hasattr(obj, "__await__"):
+
+        if hasattr(obj, "__await__"):
             return Event.wait(obj)
-        else:
-            raise ValueError(f"Invalid type: {obj}")
+
+        raise ValueError(f"Invalid type: {obj}")
 
     @staticmethod
     def wait(future: Awaitable) -> "Wait":
