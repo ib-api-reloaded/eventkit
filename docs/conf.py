@@ -1,4 +1,4 @@
-from importlib.metadata import version
+from importlib.metadata import version as packageversion
 
 extensions = [
     "sphinx.ext.autodoc",
@@ -14,7 +14,7 @@ project = "eventkit"
 copyright = "2021, Ewald de Wit"
 author = "Ewald de Wit"
 
-__version__ = version("eventkit")
+__version__ = packageversion("eventkit")
 version = ".".join(__version__.split(".")[:2])
 release = __version__
 
