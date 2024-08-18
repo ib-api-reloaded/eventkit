@@ -1,5 +1,7 @@
 import asyncio
 import datetime as dt
+import functools
+
 from typing import AsyncIterator
 
 
@@ -16,9 +18,17 @@ class _NoValue:
 NO_VALUE = _NoValue()
 
 
+@functools.cache
 def get_event_loop():
-    """Get asyncio event loop, running or not."""
-    return asyncio.get_event_loop_policy().get_event_loop()
+    """Get asyncio event loop or create one if it doesn't exist."""
+    try:
+        # https://docs.python.org/3/library/asyncio-eventloop.html#asyncio.get_running_loop
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop
 
 
 async def timerange(start=0, end=None, step: float = 1) -> AsyncIterator[dt.datetime]:
