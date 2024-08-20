@@ -165,6 +165,26 @@ class EventTest(unittest.TestCase):
             ev1.emit(i)
         self.assertEqual(result, list(range(10, 20)))
 
+    def test_emit_threadsafe(self):
+        async def coro(d):
+            result.append(d)
+            await asyncio.sleep(0)
+
+        result = []
+        event = Event("test")
+        event += coro
+
+        event.emit_threadsafe(4)
+        event.emit_threadsafe(2)
+        run(asyncio.sleep(0))
+        self.assertEqual(result, [4, 2])
+
+        result.clear()
+        event -= coro
+        event.emit_threadsafe(8)
+        run(asyncio.sleep(0))
+        self.assertEqual(result, [])
+
 
 if __name__ == "__main__":
     unittest.main()
