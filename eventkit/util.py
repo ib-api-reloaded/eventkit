@@ -1,7 +1,7 @@
 import asyncio
 import datetime as dt
 import functools
-from typing import AsyncIterator
+from typing import AsyncIterator, Final
 
 
 class _NoValue:
@@ -14,7 +14,7 @@ class _NoValue:
     __str__ = __repr__
 
 
-NO_VALUE = _NoValue()
+NO_VALUE: Final = _NoValue()
 
 
 @functools.cache
