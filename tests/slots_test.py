@@ -1,5 +1,6 @@
 """Test Slot and Slots"""
 
+import types
 import weakref
 
 import pytest
@@ -41,14 +42,14 @@ def error_func():
 def slots_fixture():
     """Slots fixture"""
     obj = Obj()
-    meth = obj.method
+    _obj, meth = Event._split(obj.method)
     obj2 = Obj()
     wr = weakref.ref(obj2)
     slots = Slots()
-    slots.add(meth, None, None)
+    slots.add(_obj, None, meth)
     slots.add(None, None, func)
     slots.add(None, wr, None)
-    yield slots, meth, wr, obj
+    yield slots, obj.method, wr, obj
 
 
 class TestSlot:
@@ -118,7 +119,8 @@ class TestSlots:
 
         slots, meth, wr, _ = slots_fixture
         #
-        assert slots.exists(meth, None)
+        _obj, _meth = Event._split(meth)
+        assert slots.exists(_obj, _meth)
         assert slots.exists(wr(), None)
         assert slots.exists(None, func)
 
@@ -126,8 +128,9 @@ class TestSlots:
         """Test Slots.remove_obj"""
         slots, meth, wr, _ = slots_fixture
         #
-        slots.remove_obj(meth)
-        assert not slots.exists(meth, None)
+        _obj, _meth = Event._split(meth)
+        slots.remove_obj(_obj)
+        assert not slots.exists(_obj, _meth)
         assert slots.exists(wr(), None)
         #
         slots.remove_obj(wr)
@@ -140,9 +143,10 @@ class TestSlots:
         slots, meth, wr, _ = slots_fixture
 
         #
+        _obj, _meth = Event._split(meth)
         slots.remove_ref(wr)
         assert not slots.exists(wr, None)
-        assert slots.exists(meth, None)
+        assert slots.exists(_obj, _meth)
         assert slots.exists(None, func)
 
     def test_slots_remove(self, slots_fixture):
