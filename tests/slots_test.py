@@ -1,6 +1,5 @@
 """Test Slot and Slots"""
 
-import types
 import weakref
 
 import pytest
