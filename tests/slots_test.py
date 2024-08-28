@@ -58,7 +58,8 @@ class TestSlot:
         """Test slot obj"""
 
         obj = Obj()
-        slot_obj = Slot(obj.method, None, None)
+        _obj, _meth = Event._split(obj.method)
+        slot_obj = Slot(_obj, None, _meth)
         #
         assert slot_obj.obj() == 42
 
@@ -81,7 +82,7 @@ class TestSlot:
         """Test slot weakref"""
         obj = Obj()
         wr = weakref.ref(obj)
-        slot1 = Slot(obj.method, None, None)
+        slot1 = Slot(obj, None, None)
         slot2 = Slot(None, wr, None)
         #
         assert slot1.obj() == 42
