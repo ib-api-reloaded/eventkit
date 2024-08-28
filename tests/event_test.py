@@ -3,10 +3,11 @@ import unittest
 
 import eventkit as ev
 from eventkit import Event
+from eventkit.util import get_event_loop
 
 
 def run(*args, **kwargs):
-    loop = asyncio.get_event_loop_policy().get_event_loop()
+    loop = get_event_loop()
     return loop.run_until_complete(*args, **kwargs)
 
 
