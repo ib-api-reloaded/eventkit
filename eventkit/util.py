@@ -1,6 +1,5 @@
 import asyncio
 import datetime as dt
-import functools
 from typing import AsyncIterator, Final
 
 
@@ -17,7 +16,6 @@ class _NoValue:
 NO_VALUE: Final = _NoValue()
 
 
-@functools.cache
 def get_event_loop():
     """Get asyncio event loop or create one if it doesn't exist."""
     try:

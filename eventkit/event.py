@@ -679,7 +679,7 @@ class Event:
             times: Relative times for individual values, in seconds since
                 start of event. The sequence should match ``values``.
         """
-        return Repeat(interval, value, count, times)
+        return Repeat(value=value, count=count, interval=interval, times=times)
 
     @staticmethod
     def range(
@@ -970,7 +970,7 @@ class Event:
         ``timeout``, ``ordered`` and ``task_limit`` apply to
         async functions only.
         """
-        return Map(func, timeout, ordered, task_limit, self)
+        return Map(func, timeout, ordered, task_limit, source=self)
 
     def emap(self, constr, joiner: "AddableJoinOp") -> "Emap":
         """

@@ -33,6 +33,7 @@ optional = true
 ruff = "^0.5.7"
 pre-commit = "^3.5.0"
 pytest = "^8.3.2"
+pytest-asyncio = "^0.24.0"
 pytest-xdist = "^3.6.1"
 mypy = "^1.11.1"
 
@@ -68,3 +69,7 @@ ignore = [
     "E402",
     "F401",
 ]
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = "session"
+asyncio_mode = "auto"
