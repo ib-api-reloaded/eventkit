@@ -1,7 +1,6 @@
 import asyncio
 import itertools
 import time
-from typing import Awaitable
 
 from ..event import Event
 from ..util import NO_VALUE, timerange
@@ -11,7 +10,7 @@ from .op import Op
 class Wait(Event):
     __slots__ = ("_task",)
 
-    def __init__(self, future: Awaitable, name="wait"):
+    def __init__(self, future, name="wait"):
         Event.__init__(self, name)
         self._task = asyncio.create_task(future)
         self._task.add_done_callback(self._on_task_done)
