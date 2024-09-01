@@ -110,7 +110,7 @@ class Slots:
                 if len(caller.error_event):
                     caller.error_event.emit(caller, error)
                 else:
-                    Event.logger.exception(
+                    caller.logger.exception(
                         f"Value {args} caused exception for event {caller}"
                     )
 
