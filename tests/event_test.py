@@ -1,4 +1,6 @@
 import asyncio
+import gc
+import platform
 import unittest
 
 import eventkit as ev
@@ -42,6 +44,8 @@ class EventTest(unittest.TestCase):
         self.assertEqual(obj2.value, -1)
 
         del obj2
+        if platform.python_implementation() == "PyPy":
+            gc.collect()
         self.assertEqual(len(event), 1)
         event -= obj1
         self.assertNotIn(obj1, event)
@@ -60,6 +64,8 @@ class EventTest(unittest.TestCase):
         self.assertEqual(obj2.value, -1)
 
         del obj2
+        if platform.python_implementation() == "PyPy":
+            gc.collect()
         self.assertEqual(len(event), 1)
         event -= obj1.method
         self.assertNotIn(obj1.method, event)
