@@ -13,10 +13,6 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: BSD License",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -24,16 +20,30 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = ">=3.10"
 numpy = "*"
-
-[tool.poetry.dev-dependencies]
-ruff = "^0.5.7"
-pre-commit = "^3.5.0"
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/ib-api-reloaded/eventkit/issues"
 
+[tool.poetry.group.dev]
+optional = true
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.5.7"
+pre-commit = "^3.5.0"
+pytest = "^8.3.2"
+pytest-xdist = "^3.6.1"
+mypy = "^1.11.1"
+
+[tool.poetry.group.docs]
+optional = true
+
+[tool.poetry.group.docs.dependencies]
+sphinx-autodoc-typehints = "^2.0.0"
+sphinx-rtd-theme = "^2.0.0"
+myst-parser = "^2.0.0"
+sphinxcontrib-napoleon = "^0.7"
 
 [build-system]
 requires = ["poetry-core"]
@@ -58,3 +68,5 @@ ignore = [
     "E402",
     "F401",
 ]
+[tool.pytest.ini_options]
+log_cli = true

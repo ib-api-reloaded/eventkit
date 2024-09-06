@@ -1,3 +1,5 @@
+from importlib.metadata import version as packageversion
+
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.viewcode",
@@ -12,12 +14,11 @@ project = "eventkit"
 copyright = "2021, Ewald de Wit"
 author = "Ewald de Wit"
 
-__version__ = None
-exec(open("../eventkit/version.py").read())
+__version__ = packageversion("eventkit")
 version = ".".join(__version__.split(".")[:2])
 release = __version__
 
-language = None
+language = "en"
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 pygments_style = "sphinx"
 todo_include_todos = False

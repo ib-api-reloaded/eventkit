@@ -1,11 +1,16 @@
 import asyncio
+import gc
+import platform
 import unittest
 
 import eventkit as ev
 from eventkit import Event
+from eventkit.util import get_event_loop
 
-loop = asyncio.get_event_loop_policy().get_event_loop()
-run = loop.run_until_complete
+
+def run(*args, **kwargs):
+    loop = get_event_loop()
+    return loop.run_until_complete(*args, **kwargs)
 
 
 class Object:
@@ -39,6 +44,8 @@ class EventTest(unittest.TestCase):
         self.assertEqual(obj2.value, -1)
 
         del obj2
+        if platform.python_implementation() == "PyPy":
+            gc.collect()
         self.assertEqual(len(event), 1)
         event -= obj1
         self.assertNotIn(obj1, event)
@@ -57,6 +64,8 @@ class EventTest(unittest.TestCase):
         self.assertEqual(obj2.value, -1)
 
         del obj2
+        if platform.python_implementation() == "PyPy":
+            gc.collect()
         self.assertEqual(len(event), 1)
         event -= obj1.method
         self.assertNotIn(obj1.method, event)
@@ -162,6 +171,26 @@ class EventTest(unittest.TestCase):
         for i in range(10):
             ev1.emit(i)
         self.assertEqual(result, list(range(10, 20)))
+
+    def test_emit_threadsafe(self):
+        async def coro(d):
+            result.append(d)
+            await asyncio.sleep(0)
+
+        result = []
+        event = Event("test")
+        event += coro
+
+        event.emit_threadsafe(4)
+        event.emit_threadsafe(2)
+        run(asyncio.sleep(0))
+        self.assertEqual(result, [4, 2])
+
+        result.clear()
+        event -= coro
+        event.emit_threadsafe(8)
+        run(asyncio.sleep(0))
+        self.assertEqual(result, [])
 
 
 if __name__ == "__main__":

@@ -16,8 +16,8 @@ class Wait(Event):
             self._task = None
             self.set_done()
         else:
-            loop = get_event_loop()
-            self._task = asyncio.ensure_future(future, loop=loop)
+            # Note: the loop= *is* necessary here.
+            self._task = asyncio.ensure_future(future, loop=get_event_loop())
             future.add_done_callback(self._on_task_done)
 
     def _on_task_done(self, task):
@@ -26,6 +26,7 @@ class Wait(Event):
         except Exception as error:
             result = NO_VALUE
             self.error_event.emit(self, error)
+
         self.emit(result)
         self._task = None
         self.set_done()
@@ -40,8 +41,9 @@ class Aiterate(Event):
 
     def __init__(self, ait):
         Event.__init__(self, ait.__qualname__)
-        loop = get_event_loop()
-        self._task = asyncio.ensure_future(self._looper(ait), loop=loop)
+
+        # Note: the loop= *is* necessary here.
+        self._task = asyncio.ensure_future(self._looper(ait), loop=get_event_loop())
 
     async def _looper(self, ait):
         try:
@@ -49,6 +51,7 @@ class Aiterate(Event):
                 self.emit(args)
         except Exception as error:
             self.error_event.emit(self, error)
+
         self._task = None
         self.set_done()
 

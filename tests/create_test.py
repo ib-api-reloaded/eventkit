@@ -2,15 +2,15 @@ import asyncio
 import unittest
 
 from eventkit import Event
+from eventkit.util import get_event_loop
 
 array1 = list(range(10))
 array2 = list(range(100, 110))
 
-loop = asyncio.get_event_loop_policy().get_event_loop()
-
 
 class CreateTest(unittest.TestCase):
     def test_wait(self):
+        loop = get_event_loop()
         fut = asyncio.Future(loop=loop)
         loop.call_later(0.001, fut.set_result, 42)
         event = Event.wait(fut)

@@ -1,23 +1,120 @@
+from __future__ import annotations
+
 import asyncio
+import itertools
 import logging
 import types
 import weakref
-from typing import (
-    Any as AnyType,
-)
+from dataclasses import dataclass, field
+from typing import Any as AnyType
 from typing import (
     AsyncIterable,
     Awaitable,
+    Callable,
+    Final,
     Iterable,
     List,
-    Optional,
     Tuple,
     Union,
 )
 
-from .util import NO_VALUE, get_event_loop, main_event_loop
+from .util import NO_VALUE, _NoValue, get_event_loop
 
 
+@dataclass(slots=True)
+class Slot:
+    obj: AnyType
+    weakref: Callable[[AnyType], AnyType] | None
+    func: Callable[[AnyType], AnyType]
+
+
+@dataclass(slots=True)
+class Slots:
+    slots: list[Slot] = field(default_factory=list)
+
+    def add(self, obj, weakref, func) -> None:
+        self.slots.append(Slot(obj, weakref, func))
+
+    def remove(self, obj, func):
+        """Remove a specific obj/func combination from the slots collection."""
+        self.slots = list(
+            itertools.filterfalse(
+                lambda x: (x.obj is obj or x.weakref and x.weakref() is obj)
+                and x.func is func,
+                self.slots,
+            )
+        )
+
+    def remove_obj(self, obj):
+        self.slots = list(
+            itertools.filterfalse(
+                lambda x: x.obj is obj or x.weakref and x.weakref() is obj,
+                self.slots,
+            )
+        )
+
+    def remove_ref(self, ref):
+        self.slots = list(
+            itertools.filterfalse(
+                lambda x: x.weakref is ref,
+                self.slots,
+            )
+        )
+
+    def exists(self, obj, func):
+        return any(
+            [
+                (x.obj is obj or x.weakref and x.weakref() is obj) and x.func is func
+                for x in self.slots
+            ]
+        )
+
+    @property
+    def count(self) -> int:
+        return len(self.slots)
+
+    def clear(self) -> None:
+        self.slots = []
+
+    def __call__(self, caller, *args, **kwargs):
+        """Loop over all active callbacks and call them"""
+        for slot in self.slots.copy():
+            ref = slot.weakref
+            func = slot.func
+
+            try:
+                if ref:
+                    obj = ref()
+                else:
+                    obj = slot.obj
+
+                result = None
+                if obj is None:
+                    if func:
+                        result = func(*args, **kwargs)
+                else:
+                    if func:
+                        result = func(obj, *args, **kwargs)
+                    else:
+                        result = obj(*args, **kwargs)
+
+                # even though asyncio.iscoroutine() would also work here,
+                # this manual hasattr() check performs better.
+                if result and hasattr(result, "__await__"):
+                    asyncio.ensure_future(result, loop=get_event_loop())
+            except Exception as error:
+                # It's not really clear in the documentation or usage that exceptions
+                # get returned via an 'error_event' callback. We should make sure
+                # people know this clearly so event handler callback errors are noticed.
+                if len(caller.error_event):
+                    caller.error_event.emit(caller, error)
+                else:
+                    caller.logger.exception(
+                        f"Value {args} caused exception for event {caller}"
+                    )
+
+
+@dataclass(slots=False)
 class Event:
     """
     Enable event passing between loosely coupled components.
@@ -28,47 +125,43 @@ class Event:
         name: Name to use for this event.
     """
 
-    __slots__ = (
-        "error_event",
-        "done_event",
-        "_name",
-        "_value",
-        "_slots",
-        "_done",
-        "_source",
-        "__weakref__",
-    )
+    _name: str = ""
+    _with_error_done_events: bool = True
 
-    NO_VALUE = NO_VALUE
-    logger = logging.getLogger(__name__)
+    # Sub event that emits errors from this event as ``emit(source, exception)``.
+    error_event: Event | None = None
 
-    error_event: Optional["Event"]
-    done_event: Optional["Event"]
-    _name: str
-    _value: AnyType
-    _slots: List[List]
-    _done: bool
-    _source: Optional["Event"]
+    # Sub event that emits when this event is done as ``emit(source)``.
+    done_event: Event | None = None
 
-    def __init__(self, name: str = "", _with_error_done_events: bool = True):
-        self.error_event = None
-        """
-        Sub event that emits errors from this event as
-        ``emit(source, exception)``.
-        """
-        self.done_event = None
-        """
-        Sub event that emits when this event is done as
-        ``emit(source)``.
-        """
-        if _with_error_done_events:
+    logger: logging.Logger = field(default_factory=lambda: logging.getLogger(__name__))
+
+    _value: AnyType = NO_VALUE
+    _slots: Final[Slots] = field(default_factory=Slots)
+    _done: bool = False
+    _source: Event | None = None
+    __weakref__: AnyType = None
+    _task: AnyType = None
+
+    NO_VALUE: Final[_NoValue] = NO_VALUE
+
+    def __post_init__(self) -> None:
+        if self._with_error_done_events:
             self.error_event = Event("error", False)
             self.done_event = Event("done", False)
-        self._slots = []  # list of [obj, weakref, func] sublists
-        self._name = name or self.__class__.__qualname__
-        self._value = NO_VALUE
-        self._done = False
-        self._source = None
+
+        if not self._name:
+            self._name = self.__class__.__qualname__
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.name,
+                self._with_error_done_events,
+                self.error_event,
+                self.done_event,
+            )
+        )
 
     def name(self) -> str:
         """
@@ -97,6 +190,7 @@ class Event:
         This event's last emitted value.
         """
         v = self._value
+
         return (
             NO_VALUE if v is NO_VALUE else v[0] if len(v) == 1 else v if v else NO_VALUE
         )
@@ -143,18 +237,22 @@ class Event:
             # let the operator connect itself to this event
             listener.set_source(self)
             return self
+
         obj, func = self._split(listener)
         if not keep_ref and hasattr(obj, "__weakref__"):
             ref = weakref.ref(obj, self._onFinalize)
             obj = None
         else:
             ref = None
-        slot = [obj, ref, func]
-        self._slots.append(slot)
+
+        self._slots.add(obj, ref, func)
+
         if self.done_event and done is not None:
             self.done_event.connect(done)
+
         if self.error_event and error is not None:
             self.error_event.connect(error)
+
         return self
 
     def disconnect(self, listener, error=None, done=None):
@@ -171,15 +269,14 @@ class Event:
             done: The done callback to disconnect.
         """
         obj, func = self._split(listener)
-        for slot in self._slots:
-            if (slot[0] is obj or slot[1] and slot[1]() is obj) and slot[2] is func:
-                slot[0] = slot[1] = slot[2] = None
-                break
-        self._slots = [s for s in self._slots if s != [None, None, None]]
+        self._slots.remove(obj, func)
+
         if error is not None:
             self.error_event.disconnect(error)
+
         if done is not None:
             self.done_event.disconnect(done)
+
         return self
 
     def disconnect_obj(self, obj):
@@ -191,12 +288,11 @@ class Event:
             obj: The target object that is to be completely removed from
               this event.
         """
-        for slot in self._slots:
-            if slot[0] is obj or slot[1] and slot[1]() is obj:
-                slot[0] = slot[1] = slot[2] = None
-        self._slots = [s for s in self._slots if s != [None, None, None]]
+        self._slots.remove_obj(obj)
+
         if self.error_event is not None:
             self.error_event.disconnect_obj(obj)
+
         if self.done_event is not None:
             self.done_event.disconnect_obj(obj)
 
@@ -208,47 +304,20 @@ class Event:
             args: Argument values to emit to listeners.
         """
         self._value = args
-        for obj, ref, func in self._slots.copy():
-            try:
-                if ref:
-                    obj = ref()
-
-                result = None
-                if obj is None:
-                    if func:
-                        result = func(*args)
-                else:
-                    if func:
-                        result = func(obj, *args)
-                    else:
-                        result = obj(*args)
-
-                if result and hasattr(result, "__await__"):
-                    loop = get_event_loop()
-                    asyncio.ensure_future(result, loop=loop)
-
-            except Exception as error:
-                if len(self.error_event):
-                    self.error_event.emit(self, error)
-                else:
-                    Event.logger.exception(
-                        f"Value {args} caused exception for event {self}"
-                    )
+        self._slots(self, *args)
 
     def emit_threadsafe(self, *args):
         """
         Threadsafe version of :meth:`emit` that doesn't invoke the
         listeners directly but via the event loop of the main thread.
         """
-        main_event_loop.call_soon_threadsafe(self.emit, *args)
+        get_event_loop().call_soon_threadsafe(self.emit, *args)
 
     def clear(self):
         """
         Disconnect all listeners.
         """
-        for slot in self._slots:
-            slot[0] = slot[1] = slot[2] = None
-        self._slots = []
+        self._slots.clear()
 
     def run(self) -> List:
         """
@@ -258,7 +327,9 @@ class Event:
             import eventkit as ev
 
             ev.Timer(0.25, count=10).run()
-            ->
+
+        Outputs:
+
             [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5]
 
         .. note::
@@ -297,6 +368,7 @@ class Event:
             t = Event.create(t)
             t.set_source(source)
             source = t
+
         return source
 
     def fork(self, *targets: "Event") -> "Fork":
@@ -322,16 +394,14 @@ class Event:
             t = Event.create(t)
             t.set_source(self)
             fork.append(t)
+
         return fork
 
     def set_source(self, source):
         self._source = source
 
     def _onFinalize(self, ref):
-        for slot in self._slots:
-            if slot[1] is ref:
-                slot[0] = slot[1] = slot[2] = None
-        self._slots = [s for s in self._slots if s != [None, None, None]]
+        self._slots.remove_ref(ref)
 
     @staticmethod
     def _split(c):
@@ -340,19 +410,22 @@ class Event:
         """
         if isinstance(c, types.FunctionType):
             return (None, c)
-        elif isinstance(c, types.MethodType):
+
+        if isinstance(c, types.MethodType):
             return (c.__self__, c.__func__)
-        elif isinstance(c, types.BuiltinMethodType):
+
+        if isinstance(c, types.BuiltinMethodType):
             if type(c.__self__) is type:
                 # built-in method
                 return (c.__self__, c)
             else:
                 # built-in function
                 return (None, c)
-        elif hasattr(c, "__call__"):
+
+        if hasattr(c, "__call__"):
             return (c, None)
-        else:
-            raise ValueError(f"Invalid callable: {c}")
+
+        raise ValueError(f"Invalid callable: {c}")
 
     async def aiter(self, skip_to_last: bool = False, tuples: bool = False):
         """
@@ -392,6 +465,7 @@ class Event:
 
         if self.done():
             return
+
         q: asyncio.Queue[Tuple[str, AnyType]] = asyncio.Queue()
         self.connect(on_event, on_error, on_done)
         try:
@@ -423,7 +497,7 @@ class Event:
         return f"Event<{self.name()}, {self._slots}>"
 
     def __len__(self):
-        return len(self._slots)
+        return self._slots.count
 
     def __bool__(self):
         return True
@@ -431,6 +505,7 @@ class Event:
     def __getitem__(self, fork_targets) -> "Fork":
         if not hasattr(fork_targets, "__iter__"):
             fork_targets = (fork_targets,)
+
         return self.fork(*fork_targets)
 
     def __await__(self):
@@ -462,6 +537,7 @@ class Event:
 
         if self.done():
             raise ValueError("Event already done")
+
         fut = asyncio.Future()
         self.connect(on_event, on_error)
         fut.add_done_callback(on_future_done)
@@ -483,10 +559,7 @@ class Event:
         See if callable is already connected.
         """
         obj, func = self._split(c)
-        return any(
-            (s[0] is obj or s[1] and s[1]() is obj) and s[2] is func
-            for s in self._slots
-        )
+        return self._slots.exists(obj, func)
 
     def __reduce__(self):
         """
@@ -523,17 +596,20 @@ class Event:
         """
         if isinstance(obj, Event):
             return obj
+
         if hasattr(obj, "__call__"):
             obj = obj()
 
         if isinstance(obj, Event):
             return obj
-        elif hasattr(obj, "__aiter__"):
+
+        if hasattr(obj, "__aiter__"):
             return Event.aiterate(obj)
-        elif hasattr(obj, "__await__"):
+
+        if hasattr(obj, "__await__"):
             return Event.wait(obj)
-        else:
-            raise ValueError(f"Invalid type: {obj}")
+
+        raise ValueError(f"Invalid type: {obj}")
 
     @staticmethod
     def wait(future: Awaitable) -> "Wait":
@@ -602,7 +678,7 @@ class Event:
             times: Relative times for individual values, in seconds since
                 start of event. The sequence should match ``values``.
         """
-        return Repeat(interval, value, count, times)
+        return Repeat(value=value, count=count, interval=interval, times=times)
 
     @staticmethod
     def range(
@@ -893,7 +969,7 @@ class Event:
         ``timeout``, ``ordered`` and ``task_limit`` apply to
         async functions only.
         """
-        return Map(func, timeout, ordered, task_limit, self)
+        return Map(func, timeout, ordered, task_limit, source=self)
 
     def emap(self, constr, joiner: "AddableJoinOp") -> "Emap":
         """
@@ -1356,9 +1432,7 @@ from .ops.aggregate import (
     Reduce,
     Sum,
 )
-from .ops.aggregate import (
-    List as ListOp,
-)
+from .ops.aggregate import List as ListOp
 from .ops.array import (
     Array,
     ArrayAll,
