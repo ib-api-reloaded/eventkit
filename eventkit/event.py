@@ -14,7 +14,6 @@ from typing import (
     Final,
     Iterable,
     List,
-    Optional,
     Tuple,
     Union,
 )

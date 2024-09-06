@@ -3,7 +3,7 @@ import itertools
 import time
 
 from ..event import Event
-from ..util import NO_VALUE, timerange
+from ..util import NO_VALUE, get_event_loop, timerange
 from .op import Op
 
 
@@ -12,13 +12,18 @@ class Wait(Event):
 
     def __init__(self, future, name="wait"):
         Event.__init__(self, name)
-        self._task = asyncio.create_task(future)
-        self._task.add_done_callback(self._on_task_done)
+        if future.done():
+            self._task = None
+            self.set_done()
+        else:
+            # Note: the loop= *is* necessary here.
+            self._task = asyncio.ensure_future(future, loop=get_event_loop())
+            future.add_done_callback(self._on_task_done)
 
     def _on_task_done(self, task):
         try:
             result = task.result()
-        except (asyncio.CancelledError, asyncio.InvalidStateError) as error:
+        except Exception as error:
             result = NO_VALUE
             self.error_event.emit(self, error)
 
@@ -36,7 +41,9 @@ class Aiterate(Event):
 
     def __init__(self, ait):
         Event.__init__(self, ait.__qualname__)
-        self._task = asyncio.create_task(self._looper(ait))
+
+        # Note: the loop= *is* necessary here.
+        self._task = asyncio.ensure_future(self._looper(ait), loop=get_event_loop())
 
     async def _looper(self, ait):
         try:
@@ -47,6 +54,10 @@ class Aiterate(Event):
 
         self._task = None
         self.set_done()
+
+    def __del__(self):
+        if self._task:
+            self._task.cancel()
 
 
 class Sequence(Aiterate):

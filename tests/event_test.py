@@ -1,9 +1,14 @@
 import asyncio
-import gc
-import platform
+import unittest
 
 import eventkit as ev
 from eventkit import Event
+from eventkit.util import get_event_loop
+
+
+def run(*args, **kwargs):
+    loop = get_event_loop()
+    return loop.run_until_complete(*args, **kwargs)
 
 
 class Object:
@@ -23,28 +28,24 @@ async def ait(it):
         yield x
 
 
-class TestEvent:
-    """Test Event"""
-
+class EventTest(unittest.TestCase):
     def test_functor(self):
         obj1 = Object()
         obj2 = Object()
         event = Event("test")
         event += obj1
         event.emit(9, 4)
-        assert obj1.value == 5
+        self.assertEqual(obj1.value, 5)
         event += obj2
         event.emit(5, 6)
-        assert obj1.value == 4
-        assert obj2.value == -1
+        self.assertEqual(obj1.value, 4)
+        self.assertEqual(obj2.value, -1)
 
         del obj2
-        if platform.python_implementation() == "PyPy":
-            gc.collect()
-        assert len(event) == 1
+        self.assertEqual(len(event), 1)
         event -= obj1
-        assert obj1 not in event
-        assert len(event) == 0
+        self.assertNotIn(obj1, event)
+        self.assertEqual(len(event), 0)
 
     def test_method(self):
         obj1 = Object()
@@ -52,25 +53,23 @@ class TestEvent:
         event = Event("test")
         event += obj1.method
         event.emit(9, 4)
-        assert obj1.value == 5
+        self.assertEqual(obj1.value, 5)
         event += obj2.method
         event.emit(5, 6)
-        assert obj1.value == 4
-        assert obj2.value == -1
+        self.assertEqual(obj1.value, 4)
+        self.assertEqual(obj2.value, -1)
 
         del obj2
-        if platform.python_implementation() == "PyPy":
-            gc.collect()
-        assert len(event) == 1
+        self.assertEqual(len(event), 1)
         event -= obj1.method
-        assert obj1.method not in event
-        assert len(event) == 0
+        self.assertNotIn(obj1.method, event)
+        self.assertEqual(len(event), 0)
 
         event += obj1.method
         event += obj1.method
-        assert len(event) == 2
+        self.assertEqual(len(event), 2)
         event.disconnect_obj(obj1)
-        assert len(event) == 0
+        self.assertEqual(len(event), 0)
 
     def test_function(self):
         def f1(x, y):
@@ -86,16 +85,16 @@ class TestEvent:
         event = Event("test")
         event += f1
         event.emit(9, 4)
-        assert value1 == 5
+        self.assertEqual(value1, 5)
         event += f2
         event.emit(5, 6)
-        assert value1 == 4
-        assert value2 == -1
+        self.assertEqual(value1, 4)
+        self.assertEqual(value2, -1)
         event -= f1
-        assert f1 not in event
+        self.assertNotIn(f1, event)
         event -= f2
-        assert f2 not in event
-        assert len(event) == 0
+        self.assertNotIn(f2, event)
+        self.assertEqual(len(event), 0)
 
     def test_cmethod(self):
         import math
@@ -113,15 +112,15 @@ class TestEvent:
         wr = weakref.ref(obj)
         del obj
         event.emit(9, 4)
-        assert wr().value == 5
+        self.assertEqual(wr().value, 5)
         obj = wr()
         event.emit(5, 6)
-        assert obj.value == 4
-        assert obj.method in event
+        self.assertEqual(obj.value, 4)
+        self.assertIn(obj.method, event)
         event -= obj.method
-        assert obj.method not in event
+        self.assertNotIn(obj.method, event)
 
-    async def test_coro_func(self):
+    def test_coro_func(self):
         async def coro(d):
             result.append(d)
             await asyncio.sleep(0)
@@ -132,34 +131,30 @@ class TestEvent:
 
         event.emit(4)
         event.emit(2)
-        await asyncio.sleep(0)
-        assert result == [4, 2]
+        run(asyncio.sleep(0))
+        self.assertEqual(result, [4, 2])
 
         result.clear()
         event -= coro
         event.emit(8)
-        await asyncio.sleep(0)
-        assert not result
+        run(asyncio.sleep(0))
+        self.assertEqual(result, [])
 
-    async def test_aiter(self):
+    def test_aiter(self):
         async def coro():
             return [v async for v in event]
 
         a = list(range(0, 10))
         event = Event.sequence(a)
-        result = await coro()
-        assert result == a
+        result = run(coro())
+        self.assertEqual(result, a)
 
-    async def test_fork(self):
-        res = await Event.range(4, 10)[ev.Min, ev.Max, ev.Op().sum()].zip().list()
-        assert res == [
-            (4, 4, 4),
-            (4, 5, 9),
-            (4, 6, 15),
-            (4, 7, 22),
-            (4, 8, 30),
-            (4, 9, 39),
-        ]
+    def test_fork(self):
+        event = Event.range(4, 10)[ev.Min, ev.Max, ev.Op().sum()].zip()
+        self.assertEqual(
+            event.run(),
+            [(4, 4, 4), (4, 5, 9), (4, 6, 15), (4, 7, 22), (4, 8, 30), (4, 9, 39)],
+        )
 
     def test_operator_connect(self):
         result = []
@@ -169,9 +164,9 @@ class TestEvent:
         ev1 += ev2
         for i in range(10):
             ev1.emit(i)
-        assert result == list(range(10, 20))
+        self.assertEqual(result, list(range(10, 20)))
 
-    async def test_emit_threadsafe(self):
+    def test_emit_threadsafe(self):
         async def coro(d):
             result.append(d)
             await asyncio.sleep(0)
@@ -182,11 +177,15 @@ class TestEvent:
 
         event.emit_threadsafe(4)
         event.emit_threadsafe(2)
-        await asyncio.sleep(0.1)
-        assert result == [4, 2]
+        run(asyncio.sleep(0))
+        self.assertEqual(result, [4, 2])
 
         result.clear()
         event -= coro
         event.emit_threadsafe(8)
-        await asyncio.sleep(0)
-        assert not result
+        run(asyncio.sleep(0))
+        self.assertEqual(result, [])
+
+
+if __name__ == "__main__":
+    unittest.main()

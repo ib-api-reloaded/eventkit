@@ -201,7 +201,7 @@ class TestSlots:
         assert obj3.value == 42
 
     def test_slots_call_exception_func(self):
-        """Test Slots.__call__ with exception"""
+        """Test Slots.__call__ with exception raised by function"""
         slots = Slots()
 
         event = Event("test_slots_call_exception")
@@ -229,9 +229,7 @@ class TestSlots:
         obj2 = Obj()
         slots.add(None, None, func)  # success
         slots.add(obj2.method, None, None)  # success
-        slots.add(None, None, error_func)  # fail
-        #
+        slots.add(obj.error, None, None)  # fail -> log
         slots(event)
-        # on error obj.value not set
         assert not hasattr(obj, "value")
         assert obj2.value == 42
