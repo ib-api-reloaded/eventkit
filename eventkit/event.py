@@ -183,7 +183,10 @@ class Event:
         """
         if not self._done:
             self._done = True
-            self.done_event.emit(self)
+            if self.done_event:
+                # done event emits and set to done too
+                self.done_event.emit(self)
+                self.done_event.set_done()
 
     def value(self):
         """
@@ -271,11 +274,11 @@ class Event:
         obj, func = self._split(listener)
         self._slots.remove(obj, func)
 
-        if error is not None:
-            self.error_event.disconnect(error)
-
-        if done is not None:
+        if self.done_event and done is not None:
             self.done_event.disconnect(done)
+
+        if self.error_event and error is not None:
+            self.error_event.disconnect(error)
 
         return self
 
