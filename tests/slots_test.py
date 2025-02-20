@@ -98,17 +98,17 @@ class TestSlots:
         meth = Obj().method
         wr = weakref.ref(Obj())
         slots = Slots()
-        #
+        # add method
         slots.add(meth, None, None)
         #
         assert len(slots.slots) == slots.count
         assert slots.slots[0].obj is meth
-        #
+        # add function
         slots.add(None, None, func)
         #
         assert len(slots.slots) == slots.count
         assert slots.slots[-1].func is func
-        #
+        # add weakref
         slots.add(None, wr, None)
         #
         assert len(slots.slots) == slots.count
@@ -184,7 +184,10 @@ class TestSlots:
         assert wr().value == 42
 
     def test_slots_call_exception(self):
-        """Test Slots.__call__ with exception"""
+        """
+        Test Slots.__call__ with exception
+        exception managed by error_event
+        """
         slots = Slots()
 
         event = Event("test_slots_call_exception")
@@ -201,7 +204,10 @@ class TestSlots:
         assert obj3.value == 42
 
     def test_slots_call_exception_func(self):
-        """Test Slots.__call__ with exception raised by function"""
+        """
+        Test Slots.__call__ with exception raised by function
+        exception managed by error_event
+        """
         slots = Slots()
 
         event = Event("test_slots_call_exception")
@@ -221,10 +227,14 @@ class TestSlots:
         assert obj3.value == 42
 
     def test_slots_call_exception_logger(self):
-        """Test Slots.__call__ with exception and Event.logger"""
+        """
+        Test Slots.__call__ with exception and logger
+        exception not managed
+        """
         slots = Slots()
 
-        event = Event("test_slots_call_exception_logger")
+        # no error_event
+        event = Event("test_slots_call_exception_logger", False)
         obj = Obj()
         obj2 = Obj()
         slots.add(None, None, func)  # success

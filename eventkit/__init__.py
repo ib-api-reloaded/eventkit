@@ -1,6 +1,6 @@
 """Event-driven data pipelines."""
 
-from .event import Event
+from .event import Event, logger
 from .ops.aggregate import (
     All,
     Any,

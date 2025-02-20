@@ -20,6 +20,8 @@ from typing import (
 
 from .util import NO_VALUE, _NoValue, get_event_loop
 
+logger: logging.Logger = logging.getLogger(__name__)
+
 
 @dataclass(slots=True)
 class Slot:
@@ -106,11 +108,11 @@ class Slots:
                 # It's not really clear in the documentation or usage that exceptions
                 # get returned via an 'error_event' callback. We should make sure
                 # people know this clearly so event handler callback errors are noticed.
-                if len(caller.error_event):
+                if caller.error_event:
                     caller.error_event.emit(caller, error)
                 else:
-                    caller.logger.exception(
-                        f"Value {args} caused exception for event {caller}"
+                    logger.exception(
+                        "Value %s caused exception for event %s", args, caller
                     )
 
 
@@ -133,8 +135,6 @@ class Event:
 
     # Sub event that emits when this event is done as ``emit(source)``.
     done_event: Event | None = None
-
-    logger: logging.Logger = field(default_factory=lambda: logging.getLogger(__name__))
 
     _value: AnyType = NO_VALUE
     _slots: Final[Slots] = field(default_factory=Slots)

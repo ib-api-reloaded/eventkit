@@ -1,6 +1,6 @@
 from typing import Union
 
-from ..event import Event
+from ..event import Event, logger
 
 
 class Op(Event):
@@ -30,7 +30,7 @@ class Op(Event):
         if len(self.error_event):
             self.error_event.emit(source, error)
         else:
-            Event.logger.exception(error)
+            logger.exception(error)
 
     def on_source_done(self, _source):
         if self._source is not None:
