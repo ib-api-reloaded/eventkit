@@ -192,6 +192,50 @@ class EventTest(unittest.TestCase):
         run(asyncio.sleep(0))
         self.assertEqual(result, [])
 
+    def test_done_event(self):
+        """
+        Test that the done event is set when the event is done. #6"""
+        emit_value = 0
+        done_value = 0
+
+        def on_emit(event_arg):
+            nonlocal emit_value
+            emit_value = 42
+            event_arg.set_done()
+
+        def on_done(event_arg):
+            nonlocal done_value
+            done_value = 42
+
+        event = Event("test")
+        event.connect(on_emit, done=on_done)
+
+        event.emit(event)
+
+        self.assertTrue(event.done())
+        self.assertTrue(event.done_event.done())
+        self.assertEqual(emit_value, done_value)
+
+    def test_wait_on_done(self):
+        """
+        Test that we can wait on the done event. #6
+        """
+
+        async def set_done(event):
+            event.emit()
+            await asyncio.sleep(1)
+            event.set_done()
+
+        async def await_done(event):
+            await event.done_event
+
+        event = Event("test")
+        run(asyncio.gather(set_done(event), await_done(event)))
+
+        self.assertEqual(len(event._slots.slots), 0)
+        self.assertTrue(event.done())
+        self.assertTrue(event.done_event.done())
+
 
 if __name__ == "__main__":
     unittest.main()
