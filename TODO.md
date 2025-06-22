@@ -1,5 +1,7 @@
 # EventKit Refactoring and Modernization TODO
 
+(auto-generated TODO from Claude suggestions. All tasks may not be valid, but some should be explored.)
+
 ## Overview
 
 This document outlines prioritized tasks for refactoring, performance improvements, and modernization of the EventKit codebase. Based on comprehensive code review and analysis.
