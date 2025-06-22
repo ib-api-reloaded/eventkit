@@ -16,14 +16,16 @@ See the examples and the
 `introduction notebook <https://github.com/ib-api-reloaded/eventkit/tree/main/notebooks/eventkit_introduction.ipynb>`_
 to get a true feel for the possibilities.
 
+Note: The `eventkit` pypi name is now `aeventkit` but we still `import eventkit`
+
 Installation
 ------------
 
 ::
 
-    pip3 install eventkit
+    pip3 install aeventkit
 
-Python_ version 3.6 or higher is required.
+Python_ version 3.10+ is required.
 
 
 Examples
