@@ -10,11 +10,11 @@ extensions = [
 templates_path = ["_templates"]
 source_suffix = ".rst"
 master_doc = "index"
-project = "eventkit"
+project = "aeventkit"
 copyright = "2021, Ewald de Wit"
 author = "Ewald de Wit"
 
-__version__ = packageversion("eventkit")
+__version__ = packageversion("aeventkit")
 version = ".".join(__version__.split(".")[:2])
 release = __version__
 
@@ -36,7 +36,7 @@ html_theme_options = {
     "includehidden": True,
     "titles_only": False,
 }
-github_url = "https://github.com/erdewit/eventkit"
+github_url = "https://github.com/ib-api-reloaded/eventkit"
 
 autoclass_content = "both"
 autodoc_member_order = "bysource"
