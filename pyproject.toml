@@ -1,6 +1,6 @@
 [tool.poetry]
-name = "eventkit"
-version = "2.0.0"
+name = "aeventkit"
+version = "2.0.1"
 description = "Event-driven data pipelines"
 authors = ["Ewald R. de Wit"]
 license = "BSD"
@@ -18,6 +18,10 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
 ]
+
+# Because we renamed the pypi top-level package to `aeventkit` but we still want to `import eventkit`
+# we need to have `packages` for `eventkit` so it can find it with our _name_ being `aeventkit` now.
+packages = [{ include = "eventkit" }]
 
 [tool.poetry.dependencies]
 python = ">=3.10"
