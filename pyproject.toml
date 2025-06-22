@@ -32,10 +32,11 @@ optional = true
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.5.7"
 pre-commit = "^3.5.0"
-pytest = "^8.3.2"
+pytest = "^8.4.1"
 pytest-xdist = "^3.6.1"
 mypy = "^1.11.1"
 pytest-cov = "^6.2.1"
+pytest-asyncio = "^1.0.0"
 
 [tool.poetry.group.docs]
 optional = true
@@ -71,4 +72,4 @@ ignore = [
 ]
 [tool.pytest.ini_options]
 log_cli = true
-asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "session"
