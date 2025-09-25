@@ -1,3 +1,5 @@
+"""Eventkit utilities."""
+
 import asyncio
 import datetime as dt
 from typing import AsyncIterator, Final
@@ -18,8 +20,15 @@ NO_VALUE: Final = _NoValue()
 
 def get_event_loop():
     """Get asyncio event loop or create one if it doesn't exist."""
-    loop = asyncio.get_event_loop_policy().get_event_loop()
-    return loop
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        try:
+            return asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            return loop
 
 
 async def timerange(start=0, end=None, step: float = 1) -> AsyncIterator[dt.datetime]:
