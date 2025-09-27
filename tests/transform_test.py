@@ -4,9 +4,16 @@ from collections import namedtuple
 
 import numpy as np
 
+import eventkit as ev
 from eventkit import Event
+from eventkit.util import get_event_loop
 
 array = list(range(20))
+
+
+def run(*args, **kwargs):
+    loop = get_event_loop()
+    return loop.run_until_complete(*args, **kwargs)
 
 
 class TransformTest(unittest.TestCase):
@@ -151,3 +158,31 @@ class TransformTest(unittest.TestCase):
         ]
         event = Event.range(3).switchmap(lambda v: Event.marble(marbles[v]))
         self.assertEqual(event.run(), ["A", "B", "1", "2", "K", "L", "M", "N"])
+
+    def test_map_with_future(self):
+        """Verify that Map correctly handles functions that return a Future."""
+        # Create a future that we will complete manually
+        my_future = asyncio.Future()
+
+        # The map function will just return our future
+        def map_func(x):
+            return my_future
+
+        event = Event.sequence([1]).map(map_func)
+        result = []
+        event.connect(result.append)
+
+        # Give the event loop a chance to run the map
+        run(asyncio.sleep(0))
+
+        # The event should not have emitted yet, as the future is not done
+        self.assertEqual(result, [])
+
+        # Now, complete the future
+        my_future.set_result(42)
+
+        # Give the event loop a chance to process the completion
+        run(asyncio.sleep(0))
+
+        # The event should now have emitted the future's result
+        self.assertEqual(result, [42])
