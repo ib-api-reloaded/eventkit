@@ -1,10 +1,13 @@
 import asyncio
 import itertools
+import logging
 import time
 
 from ..event import Event
 from ..util import NO_VALUE, get_event_loop, timerange
 from .op import Op
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Wait(Event):
@@ -16,8 +19,8 @@ class Wait(Event):
             self._task = None
             self.set_done()
         else:
-            # Note: the loop= *is* necessary here.
-            self._task = asyncio.ensure_future(future, loop=get_event_loop())
+            loop = get_event_loop()
+            self._task = asyncio.ensure_future(future, loop=loop)
             future.add_done_callback(self._on_task_done)
 
     def _on_task_done(self, task):
@@ -35,27 +38,50 @@ class Wait(Event):
         if self._task:
             self._task.cancel()
 
+    def cancel(self):
+        if self._task and not self._task.done():
+            self._task.cancel()
+
 
 class Aiterate(Event):
-    __slots__ = ("_task",)
+    __slots__ = ("_task", "_ait")
 
     def __init__(self, ait):
         Event.__init__(self, ait.__qualname__)
+        self._ait = ait
+        self._task = None
 
-        # Note: the loop= *is* necessary here.
-        self._task = asyncio.ensure_future(self._looper(ait), loop=get_event_loop())
-
-    async def _looper(self, ait):
+    async def _looper(self):
         try:
-            async for args in ait:
+            async for args in self._ait:
                 self.emit(args)
+        except asyncio.CancelledError:
+            # Task was cancelled, clean up and exit gracefully
+            logger.debug(f"Aiterate task for {self.name()} cancelled.")
         except Exception as error:
             self.error_event.emit(self, error)
+        finally:
+            self.set_done()
 
-        self._task = None
-        self.set_done()
+    def connect(self, *args, **kwargs):
+        if self._task is None:
+            loop = get_event_loop()
+            self._task = loop.create_task(self._looper())
+        return super().connect(*args, **kwargs)
+
+    def cancel(self):
+        """
+        Explicitly cancels the underlying asyncio task and sets the event as done.
+        """
+        if self._task and not self._task.done():
+            self._task.cancel()
+            logger.debug(f"Aiterate task for {self.name()} requested cancellation.")
+        self.set_done()  # Re-enabled to fix race condition
 
     def __del__(self):
+        # The __del__ method is unreliable for timely resource cleanup.
+        # Explicit `cancel()` method should be preferred.
+        # However, keeping this for robustness in case `cancel()` is not called.
         if self._task:
             self._task.cancel()
 

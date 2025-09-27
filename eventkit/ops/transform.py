@@ -1,11 +1,14 @@
 import asyncio
 import copy
+import logging
 import time
 from collections import deque
 
-from ..util import NO_VALUE
+from ..util import NO_VALUE, get_event_loop
 from .combine import Chain, Concat, Merge, Switch
 from .op import Op
+
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Constant(Op):
@@ -210,7 +213,15 @@ class ChunkWith(Op):
 
 
 class Map(Op):
-    __slots__ = ("_func", "_timeout", "_ordered", "_task_limit", "_coro_q", "_tasks")
+    __slots__ = (
+        "_func",
+        "_timeout",
+        "_ordered",
+        "_task_limit",
+        "_coro_q",
+        "_tasks",
+        "_pending_ordered",
+    )
 
     def __init__(self, func, timeout=0, ordered=True, task_limit=None, source=None):
         Op.__init__(self, source)
@@ -222,9 +233,12 @@ class Map(Op):
         self._ordered = ordered
         self._task_limit = task_limit
         self._coro_q = deque()
-        self._tasks = deque()
+        self._tasks = set()  # the use of `set` eliminates race conditions
+        self._pending_ordered = deque() if ordered else None
 
     def on_source(self, *args):
+        if self.done():
+            return
         obj = self._func(*args)
         if asyncio.iscoroutine(obj):
             # function returns an awaitable
@@ -239,50 +253,77 @@ class Map(Op):
             self.emit(obj)
 
     def on_source_done(self, source):
-        if not self._tasks:
-            # only end when no tasks are pending
-            Op.on_source_done(self, self._source)
-
-        self._source = None
+        if not self._tasks and not self._coro_q:
+            super().on_source_done(source)
 
     def _create_task(self, coro):
-        # schedule a task to be run
         if self._timeout:
             coro = asyncio.wait_for(coro, self._timeout)
 
-        task = asyncio.create_task(coro)
+        loop = get_event_loop()
+        task = loop.create_task(coro)
+        self._tasks.add(task)
         task.add_done_callback(self._on_task_done)
-        self._tasks.append(task)
+        if self._ordered:
+            self._pending_ordered.append(task)
 
     def _on_task_done(self, task):
-        # handle task result
-        tasks = self._tasks
-        if self._ordered:
-            while tasks and tasks[0].done():
-                # remove task after emitting result
-                task = tasks[0]
-                self._emit_task(task)
-                task = tasks.popleft()
-        else:
-            # remove task after emitting result
-            self._emit_task(task)
-            tasks.remove(task)
+        """handle task completion"""
+        self._tasks.discard(task)
 
-        # schedule pending awaitables from the queue
-        while self._coro_q and (not self._task_limit or len(tasks) < self._task_limit):
-            self._create_task(self._coro_q.popleft())
+        if not self.done():  # If we are not in a cancellation flow
+            if self._ordered:
+                while self._pending_ordered and self._pending_ordered[0].done():
+                    done_task = self._pending_ordered.popleft()
+                    self._emit_task_result(done_task)
+            else:
+                self._emit_task_result(task)
 
-        # end when source has ended with no pending tasks
-        if not tasks and self._source is None:
-            Op.on_source_done(self, self._source)
+            # Schedule new tasks from the queue if space is available
+            while self._coro_q and (
+                not self._task_limit or len(self._tasks) < self._task_limit
+            ):
+                self._create_task(self._coro_q.popleft())
 
-    def _emit_task(self, task):
+        # Check if everything is finished
+        if (
+            self._source
+            and self._source.done()
+            and not self._tasks
+            and not self._coro_q
+        ):
+            super().on_source_done(self._source)
+
+    def _emit_task_result(self, task):
         try:
             result = task.result()
+            self.emit(result)
+        except asyncio.CancelledError:
+            return
         except Exception as error:
-            result = NO_VALUE
             self.error_event.emit(error)
-        self.emit(result)
+
+    def cancel(self):
+        if self.done():
+            return
+
+        # 1. Immediately mark as done to prevent any more processing
+        super().set_done()
+
+        # 2. Disconnect from source
+        if self._source:
+            self._disconnect_from(self._source)
+            self._source = None
+
+        # 3. Cancel pending work
+        for coro in self._coro_q:
+            coro.close()  # Prevent ResourceWarning: coroutine was never awaited
+        self._coro_q.clear()
+
+        # 4. Cancel all in-flight tasks
+        for task in self._tasks:
+            task.cancel()
+        self._tasks.clear()
 
 
 class Emap(Op):

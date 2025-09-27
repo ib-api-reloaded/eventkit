@@ -72,4 +72,6 @@ ignore = [
 ]
 [tool.pytest.ini_options]
 log_cli = true
-asyncio_default_test_loop_scope = "session"
+asyncio_mode = "strict"
+asyncio_default_test_loop_scope = "function"
+asyncio_default_fixture_loop_scope = "function"

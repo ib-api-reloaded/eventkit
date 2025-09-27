@@ -355,7 +355,14 @@ class Event:
 
         async def _run_and_clean():
             # This coroutine will be run to completion.
-            result = await self.list()
+            list_op_event = self.list()  # Get the ListOp event
+            result = (
+                await list_op_event
+            )  # Await its completion (which means it emits its list)
+
+            # Explicitly wait for the ListOp event to be done.
+            # This ensures its source (e.g., Aiterate) has also completed its lifecycle.
+            await list_op_event.wait_until_done()
 
             # Now, perform the explicit cleanup of any other background tasks.
             current_loop = asyncio.get_running_loop()
@@ -519,6 +526,8 @@ class Event:
                     break
         finally:
             self.disconnect(on_event, on_error, on_done)
+            if hasattr(self, "cancel"):
+                self.cancel()
 
     __iadd__ = connect
     __isub__ = disconnect
@@ -592,6 +601,24 @@ class Event:
         """
         obj, func = self._split(c)
         return self._slots.exists(obj, func)
+
+    async def wait_until_done(self):
+        """
+        Asynchronously waits until this event is done.
+        """
+        if self.done():
+            return
+        fut = asyncio.Future()
+
+        def on_done(source):
+            if not fut.done():
+                fut.set_result(None)
+
+        self.done_event.connect(on_done)
+        try:
+            await fut
+        finally:
+            self.done_event.disconnect(on_done)
 
     def __reduce__(self):
         """

@@ -38,6 +38,13 @@ class Op(Event):
             self._source = None
         self.set_done()
 
+    def set_done(self):
+        if not self.done():
+            super().set_done()
+            # An operator being done means it no longer needs its source.
+            if self._source and hasattr(self._source, "cancel"):
+                self._source.cancel()
+
     def set_source(self, source):
         source = Event.create(source)
         if self._source is None:
