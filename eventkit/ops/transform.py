@@ -3,7 +3,7 @@ import copy
 import time
 from collections import deque
 
-from ..util import NO_VALUE
+from ..util import NO_VALUE, get_event_loop
 from .combine import Chain, Concat, Merge, Switch
 from .op import Op
 
@@ -226,7 +226,7 @@ class Map(Op):
 
     def on_source(self, *args):
         obj = self._func(*args)
-        if asyncio.iscoroutine(obj):
+        if hasattr(obj, "__await__"):
             # function returns an awaitable
             if not self._task_limit or len(self._tasks) < self._task_limit:
                 # schedule right away
@@ -245,12 +245,12 @@ class Map(Op):
 
         self._source = None
 
-    def _create_task(self, coro):
+    def _create_task(self, awaitable):
         # schedule a task to be run
         if self._timeout:
-            coro = asyncio.wait_for(coro, self._timeout)
+            awaitable = asyncio.wait_for(awaitable, self._timeout)
 
-        task = asyncio.create_task(coro)
+        task = asyncio.ensure_future(awaitable, loop=get_event_loop())
         task.add_done_callback(self._on_task_done)
         self._tasks.append(task)
 
