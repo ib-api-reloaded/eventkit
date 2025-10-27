@@ -23,6 +23,13 @@ class TimingTest(unittest.TestCase):
         self.assertEqual(event.run(), [2, 4, 6, 8])
 
     def test_timeout(self):
+        # source faster than timeout
+        seq = Event.sequence(array1, interval=0.01).timeout(0.1)
+        self.assertEqual(seq.run(), array1)
+        # source slower than timeout
+        seq2 = Event.sequence([1, 2, 3], interval=0.1).timeout(0.01)
+        self.assertEqual(seq2.run(), [1, Event.NO_VALUE])
+        # plain timeout
         timer = Event.timer(10, count=1)
         event = timer.timeout(0.01)
         self.assertEqual(event.run(), [Event.NO_VALUE])
