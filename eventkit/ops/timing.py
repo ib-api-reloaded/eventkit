@@ -44,6 +44,7 @@ class Timeout(Op):
     def on_source(self, *args):
         loop = get_event_loop()
         self._last_time = loop.time()
+        Op.on_source(self, *args)
 
     def on_source_done(self, source):
         self._handle.cancel()
