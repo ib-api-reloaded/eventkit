@@ -346,36 +346,7 @@ class Event:
                 await event.list()
         """
         loop = get_event_loop()
-
-        if loop.is_running():
-            raise RuntimeError(
-                "Event.run() cannot be called from within an already running "
-                "asyncio event loop. Use 'await event.list()' instead."
-            )
-
-        async def _run_and_clean():
-            # This coroutine will be run to completion.
-            result = await self.list()
-
-            # Now, perform the explicit cleanup of any other background tasks.
-            current_loop = asyncio.get_running_loop()
-            all_tasks = asyncio.all_tasks(loop=current_loop)
-            current_task = asyncio.current_task(loop=current_loop)
-
-            pending_tasks = [
-                task
-                for task in all_tasks
-                if task is not current_task and not task.done()
-            ]
-
-            if pending_tasks:
-                for task in pending_tasks:
-                    task.cancel()
-                await asyncio.gather(*pending_tasks, return_exceptions=True)
-
-            return result
-
-        return loop.run_until_complete(_run_and_clean())
+        return loop.run_until_complete(self.list())
 
     def pipe(self, *targets: "Event"):
         """
