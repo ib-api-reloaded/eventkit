@@ -25,7 +25,9 @@ packages = [{ include = "eventkit" }]
 
 [tool.poetry.dependencies]
 python = ">=3.10"
-numpy = "*"
+
+[tool.poetry.extras]
+numpy = ["numpy"]
 
 [tool.poetry.urls]
 "Bug Tracker" = "https://github.com/ib-api-reloaded/eventkit/issues"
@@ -77,3 +79,7 @@ ignore = [
 [tool.pytest.ini_options]
 log_cli = true
 asyncio_default_test_loop_scope = "session"
+
+[[tool.mypy.overrides]]
+module = ["numpy"]
+ignore_missing_imports = true

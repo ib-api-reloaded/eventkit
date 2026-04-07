@@ -1,15 +1,25 @@
 from collections import deque
-
-import numpy as np
+from types import ModuleType
 
 from ..util import NO_VALUE
 from .op import Op
+
+np: ModuleType | None
+try:
+    import numpy as np
+except ImportError:
+    np = None
 
 
 class Array(Op):
     __slots__ = ("_count", "_q")
 
     def __init__(self, count, source=None):
+        if np is None:
+            raise ImportError(
+                "numpy is required for Array operators. "
+                "Install it with: pip install numpy"
+            )
         Op.__init__(self, source)
         self._count = count
         self._q = deque()
