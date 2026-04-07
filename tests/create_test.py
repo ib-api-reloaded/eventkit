@@ -11,7 +11,7 @@ array2 = list(range(100, 110))
 class CreateTest(unittest.TestCase):
     def test_wait(self):
         loop = get_event_loop()
-        fut = asyncio.Future(loop=loop)
+        fut = loop.create_future()
         loop.call_later(0.001, fut.set_result, 42)
         event = Event.wait(fut)
         self.assertEqual(event.run(), [42])
