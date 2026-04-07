@@ -118,7 +118,7 @@ class Pairwise(Op):
         self._has_prev = False
 
     def on_source(self, *args):
-        value = args[0] if len(args) == 1 else args if args else NO_VALUE
+        value = args[0] if len(args) == 1 else args or NO_VALUE
         if self._has_prev:
             self.emit(self._prev, value)
         else:
@@ -134,7 +134,7 @@ class List(Op):
         self._values = []
 
     def on_source(self, *args):
-        self._values.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._values.append(args[0] if len(args) == 1 else args or NO_VALUE)
 
     def on_source_done(self, source):
         self.emit(self._values)
@@ -150,7 +150,7 @@ class Deque(Op):
         self._q = deque()
 
     def on_source(self, *args):
-        self._q.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._q.append(args[0] if len(args) == 1 else args or NO_VALUE)
         if self._count and len(self._q) > self._count:
             self._q.popleft()
         self.emit(self._q)

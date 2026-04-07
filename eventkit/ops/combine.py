@@ -45,7 +45,7 @@ class JoinOp(Op):
 
     __slots__ = ("_sources",)
 
-    _sources: Deque[Event]
+    _sources: deque[Event]
 
     def _set_sources(self, sources):
         raise NotImplementedError
@@ -59,7 +59,7 @@ class AddableJoinOp(JoinOp):
 
     __slots__ = ("_parent",)
 
-    _parent: Optional[Event]
+    _parent: Event | None
 
     def __init__(self, *sources: Event):
         JoinOp.__init__(self)
@@ -246,7 +246,7 @@ class Zip(JoinOp):
             ready = self._num_ready == len(self._results)
         else:
             ready = False
-        q.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
+        q.append(args[0] if len(args) == 1 else args or NO_VALUE)
         if ready:
             tup = tuple(q.popleft() for q in self._results)
             self._num_ready = sum(bool(q) for q in self._results)
@@ -285,7 +285,7 @@ class Ziplatest(JoinOp):
             self._source2cbs[source].append(cb)
 
     def _on_source_i(self, i, *args):
-        self._values[i] = args[0] if len(args) == 1 else args if args else NO_VALUE
+        self._values[i] = args[0] if len(args) == 1 else args or NO_VALUE
         if not self._is_primed:
             self._is_primed = not any(r is NO_VALUE for r in self._values)
         if self._is_primed:

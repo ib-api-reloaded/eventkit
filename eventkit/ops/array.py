@@ -25,7 +25,7 @@ class Array(Op):
         self._q = deque()
 
     def on_source(self, *args):
-        self._q.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._q.append(args[0] if len(args) == 1 else args or NO_VALUE)
         if self._count and len(self._q) > self._count:
             self._q.popleft()
         self.emit(np.asarray(self._q))

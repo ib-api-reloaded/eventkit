@@ -3,7 +3,8 @@
 import asyncio
 import datetime as dt
 import threading
-from typing import AsyncIterator, Final
+from collections.abc import AsyncIterator
+from typing import Final
 
 _thread_local = threading.local()
 
@@ -47,8 +48,10 @@ def schedule_awaitable(awaitable):
     if asyncio.isfuture(awaitable):
         return awaitable
     if not asyncio.iscoroutine(awaitable):
+
         async def _wrap(a=awaitable):
             return await a
+
         awaitable = _wrap()
     return get_event_loop().create_task(awaitable)
 

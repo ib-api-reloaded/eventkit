@@ -19,7 +19,7 @@ class Op(Event):
 
     __slots__ = ()
 
-    def __init__(self, source: Union[Event, None] = None):
+    def __init__(self, source: Event | None = None):
         Event.__init__(self)
         if source is not None:
             self.set_source(source)

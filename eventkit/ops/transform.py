@@ -44,7 +44,7 @@ class Enumerate(Op):
         self._step = step
 
     def on_source(self, *args):
-        self.emit(self._i, args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self.emit(self._i, args[0] if len(args) == 1 else args or NO_VALUE)
         self._i += self._step
 
 
@@ -52,9 +52,7 @@ class Timestamp(Op):
     __slots__ = ()
 
     def on_source(self, *args):
-        self.emit(
-            time.time(), args[0] if len(args) == 1 else args if args else NO_VALUE
-        )
+        self.emit(time.time(), args[0] if len(args) == 1 else args or NO_VALUE)
 
 
 class Partial(Op):
@@ -165,7 +163,7 @@ class Chunk(Op):
         self._list = []
 
     def on_source(self, *args):
-        self._list.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._list.append(args[0] if len(args) == 1 else args or NO_VALUE)
         if len(self._list) == self._size:
             self.emit(self._list)
             self._list = []
@@ -188,7 +186,7 @@ class ChunkWith(Op):
         timer.connect(self._on_timer, self.on_source_error, self.on_source_done)
 
     def on_source(self, *args):
-        self._list.append(args[0] if len(args) == 1 else args if args else NO_VALUE)
+        self._list.append(args[0] if len(args) == 1 else args or NO_VALUE)
 
     def _on_timer(self, *args):
         if self._list or self._emit_empty:
