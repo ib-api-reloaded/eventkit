@@ -3,7 +3,7 @@ import copy
 import time
 from collections import deque
 
-from ..util import NO_VALUE, get_event_loop
+from ..util import NO_VALUE, schedule_awaitable
 from .combine import Chain, Concat, Merge, Switch
 from .op import Op
 
@@ -250,7 +250,7 @@ class Map(Op):
         if self._timeout:
             awaitable = asyncio.wait_for(awaitable, self._timeout)
 
-        task = asyncio.ensure_future(awaitable, loop=get_event_loop())
+        task = schedule_awaitable(awaitable)
         task.add_done_callback(self._on_task_done)
         self._tasks.append(task)
 

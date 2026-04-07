@@ -18,7 +18,7 @@ from typing import (
     Union,
 )
 
-from .util import NO_VALUE, _NoValue, get_event_loop
+from .util import NO_VALUE, _NoValue, get_event_loop, schedule_awaitable
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class Slots:
                 # even though asyncio.iscoroutine() would also work here,
                 # this manual hasattr() check performs better.
                 if result and hasattr(result, "__await__"):
-                    asyncio.ensure_future(result, loop=get_event_loop())
+                    schedule_awaitable(result)
             except Exception as error:
                 # It's not really clear in the documentation or usage that exceptions
                 # get returned via an 'error_event' callback. We should make sure

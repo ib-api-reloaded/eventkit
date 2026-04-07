@@ -2,7 +2,10 @@
 
 import asyncio
 import datetime as dt
+import threading
 from typing import AsyncIterator, Final
+
+_thread_local = threading.local()
 
 
 class _NoValue:
@@ -19,16 +22,35 @@ NO_VALUE: Final = _NoValue()
 
 
 def get_event_loop():
-    """Get asyncio event loop or create one if it doesn't exist."""
+    """Get the running event loop, or create/cache one for sync contexts."""
     try:
         return asyncio.get_running_loop()
     except RuntimeError:
-        try:
-            return asyncio.get_event_loop()
-        except RuntimeError:
+        loop = getattr(_thread_local, "loop", None)
+        if loop is None or loop.is_closed():
             loop = asyncio.new_event_loop()
+            _thread_local.loop = loop
+            # Keep the policy in sync so asyncio.gather() et al. work
+            # in sync contexts. set_event_loop is deprecated (removal
+            # targeted for 3.16) but still needed for interop.
             asyncio.set_event_loop(loop)
-            return loop
+        return loop
+
+
+def schedule_awaitable(awaitable):
+    """Schedule an awaitable on the event loop.
+
+    Handles coroutines, Futures, Tasks, and generic awaitables.
+    Works in both sync and async contexts. Replaces deprecated
+    asyncio.ensure_future().
+    """
+    if asyncio.isfuture(awaitable):
+        return awaitable
+    if not asyncio.iscoroutine(awaitable):
+        async def _wrap(a=awaitable):
+            return await a
+        awaitable = _wrap()
+    return get_event_loop().create_task(awaitable)
 
 
 async def timerange(start=0, end=None, step: float = 1) -> AsyncIterator[dt.datetime]:

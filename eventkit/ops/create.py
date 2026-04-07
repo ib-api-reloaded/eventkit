@@ -3,7 +3,7 @@ import itertools
 import time
 
 from ..event import Event
-from ..util import NO_VALUE, get_event_loop, timerange
+from ..util import NO_VALUE, get_event_loop, schedule_awaitable, timerange
 from .op import Op
 
 
@@ -16,8 +16,7 @@ class Wait(Event):
             self._task = None
             self.set_done()
         else:
-            # Note: the loop= *is* necessary here.
-            self._task = asyncio.ensure_future(future, loop=get_event_loop())
+            self._task = schedule_awaitable(future)
             future.add_done_callback(self._on_task_done)
 
     def _on_task_done(self, task):
@@ -42,8 +41,7 @@ class Aiterate(Event):
     def __init__(self, ait):
         Event.__init__(self, ait.__qualname__)
 
-        # Note: the loop= *is* necessary here.
-        self._task = asyncio.ensure_future(self._looper(ait), loop=get_event_loop())
+        self._task = schedule_awaitable(self._looper(ait))
 
     async def _looper(self, ait):
         try:
