@@ -3,11 +3,11 @@ name: Build 🛠️ and test 🧪 eventkit
 on: [push, workflow_dispatch]
 
 jobs:
-    build:
+    poetry:
         runs-on: ubuntu-latest
         strategy:
             matrix:
-                python-version: ["pypy3.10", "pypy3.11", "3.10", "3.11", "3.12", "3.13"]
+                python-version: ["pypy3.11", "3.11", "3.12", "3.13", "3.14"]
 
         steps:
           - uses: actions/checkout@v6
@@ -16,27 +16,51 @@ jobs:
             with:
                 python-version: ${{ matrix.python-version }}
                 cache: pip
-                # Print the current Python version
           - name: Display Python version
             run: python -c "import sys; print(sys.version)"
+          - name: Install Poetry
+            run: python -m pip install -U pip "poetry==2.3.2"
           - name: Install dependencies
-            run: |
-                python -m pip install -U pip poetry
-                poetry install --with dev
-
+            run: poetry install --with dev -E numpy
           - name: Ruff static code analysis
             run: |
                 poetry run ruff check eventkit/
-                poetry run ruff format eventkit/
-
+                poetry run ruff format --check eventkit/
           - name: MyPy static code analysis
-            run: |
-                poetry run mypy .
-
+            if: startsWith(matrix.python-version, 'pypy') == false
+            run: poetry run mypy .
           - name: Test with pytest
-            run: |
-                poetry run pytest -vs
-
+            run: poetry run pytest -vs
           - name: Build a binary wheel and a source tarball
+            run: poetry build -n
+
+    uv:
+        runs-on: ubuntu-latest
+        strategy:
+            matrix:
+                python-version: ["pypy3.11", "3.11", "3.12", "3.13", "3.14"]
+
+        steps:
+          - uses: actions/checkout@v6
+          - name: Set up Python ${{ matrix.python-version }}
+            uses: actions/setup-python@v6
+            with:
+                python-version: ${{ matrix.python-version }}
+                cache: pip
+          - name: Set up uv
+            uses: astral-sh/setup-uv@v7
+          - name: Display Python version
+            run: python -c "import sys; print(sys.version)"
+          - name: Install dependencies
+            run: uv sync --extra numpy --group dev
+          - name: Ruff static code analysis
             run: |
-                poetry build -n
+                uv run ruff check eventkit/
+                uv run ruff format --check eventkit/
+          - name: MyPy static code analysis
+            if: startsWith(matrix.python-version, 'pypy') == false
+            run: uv run mypy .
+          - name: Test with pytest
+            run: uv run pytest -vs
+          - name: Build a binary wheel and a source tarball
+            run: uv build

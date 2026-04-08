@@ -1,12 +1,12 @@
 from collections import deque
+from importlib import import_module
 from types import ModuleType
 
 from ..util import NO_VALUE
 from .op import Op
 
-np: ModuleType | None
 try:
-    import numpy as np
+    np: ModuleType | None = import_module("numpy")
 except ImportError:
     np = None
 
