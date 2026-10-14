@@ -1,6 +1,5 @@
 import asyncio
 import itertools
-import time
 
 from ..event import Event
 from ..util import NO_VALUE, get_event_loop, schedule_awaitable, timerange
@@ -63,16 +62,15 @@ class Sequence(Aiterate):
 
     def __init__(self, values, interval=0, times=None):
         async def sequence():
-            t0 = time.time()
+            loop = asyncio.get_running_loop()
+            t0 = loop.time()
             if times is not None:
                 for t, value in zip(times, values):
-                    delay = max(0, time.time() + t - t0)
-                    await asyncio.sleep(delay)
+                    await asyncio.sleep(max(0, t0 + t - loop.time()))
                     yield value
             else:
                 for i, value in enumerate(values):
-                    delay = max(0, i * interval + t0 - time.time())
-                    await asyncio.sleep(delay)
+                    await asyncio.sleep(max(0, t0 + i * interval - loop.time()))
                     yield value
 
         Aiterate.__init__(self, sequence())
@@ -104,12 +102,12 @@ class Timer(Aiterate):
 
     def __init__(self, interval, count=None):
         async def timer():
-            t0 = time.time()
+            loop = asyncio.get_running_loop()
+            t0 = loop.time()
             i = 0
             while count is None or i < count:
                 i += 1
-                delay = i * interval + t0 - time.time()
-                await asyncio.sleep(delay)
+                await asyncio.sleep(t0 + i * interval - loop.time())
                 yield i * interval
 
         Aiterate.__init__(self, timer())
