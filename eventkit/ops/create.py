@@ -1,7 +1,7 @@
 import asyncio
 import itertools
 
-from ..event import Event
+from ..event import Event, event_class
 from ..util import NO_VALUE, schedule_awaitable, timerange
 from .op import Op
 
@@ -14,9 +14,8 @@ def _cancel_unless_loop_closed(task) -> None:
         task.cancel()
 
 
+@event_class
 class Wait(Event):
-    __slots__ = ("_task",)
-
     def __init__(self, future, name="wait"):
         Event.__init__(self, name)
         if future.done():
@@ -47,9 +46,8 @@ class Wait(Event):
         _cancel_unless_loop_closed(self._task)
 
 
+@event_class
 class Aiterate(Event):
-    __slots__ = ("_task",)
-
     def __init__(self, ait):
         Event.__init__(self, ait.__qualname__)
 
@@ -77,9 +75,8 @@ class Aiterate(Event):
         _cancel_unless_loop_closed(self._task)
 
 
+@event_class
 class Sequence(Aiterate):
-    __slots__ = ()
-
     def __init__(self, values, interval=0, times=None):
         async def sequence():
             loop = asyncio.get_running_loop()
@@ -96,30 +93,26 @@ class Sequence(Aiterate):
         Aiterate.__init__(self, sequence())
 
 
+@event_class
 class Repeat(Sequence):
-    __slots__ = ()
-
     def __init__(self, value, count, interval=0, times=None):
         Sequence.__init__(self, itertools.repeat(value, count), interval, times)
 
 
+@event_class
 class Range(Sequence):
-    __slots__ = ()
-
     def __init__(self, *args, interval=0, times=None):
         Sequence.__init__(self, range(*args), interval, times)
 
 
+@event_class
 class Timerange(Aiterate):
-    __slots__ = ()
-
     def __init__(self, start=0, end=None, step=1):
         Aiterate.__init__(self, timerange(start, end, step))
 
 
+@event_class
 class Timer(Aiterate):
-    __slots__ = ()
-
     def __init__(self, interval, count=None):
         async def timer():
             loop = asyncio.get_running_loop()
@@ -133,9 +126,8 @@ class Timer(Aiterate):
         Aiterate.__init__(self, timer())
 
 
+@event_class
 class Marble(Op):
-    __slots__ = ()
-
     def __init__(self, s, interval=0, times=None):
         s = s.replace("_", "")
         source = (

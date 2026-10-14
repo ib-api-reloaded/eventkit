@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 import asyncio
 import copy
 import time
 from collections import deque
+from collections.abc import Callable, Iterator
+from typing import Any
 
+from ..event import Event, event_class
 from ..util import NO_VALUE, schedule_awaitable
 from .combine import Chain, Concat, Merge, Switch
 from .op import Op
 
 
+@event_class
 class Constant(Op):
-    __slots__ = ("_constant",)
+    _constant: Any
 
     def __init__(self, constant, source=None):
         Op.__init__(self, source)
@@ -19,8 +25,9 @@ class Constant(Op):
         self.emit(self._constant)
 
 
+@event_class
 class Iterate(Op):
-    __slots__ = ("_it",)
+    _it: Iterator[Any]
 
     def __init__(self, it, source=None):
         Op.__init__(self, source)
@@ -35,8 +42,10 @@ class Iterate(Op):
             self.set_done()
 
 
+@event_class
 class Enumerate(Op):
-    __slots__ = ("_step", "_i")
+    _step: Any
+    _i: Any
 
     def __init__(self, start=0, step=1, source=None):
         Op.__init__(self, source)
@@ -48,15 +57,15 @@ class Enumerate(Op):
         self._i += self._step
 
 
+@event_class
 class Timestamp(Op):
-    __slots__ = ()
-
     def on_source(self, *args):
         self.emit(time.time(), args[0] if len(args) == 1 else args or NO_VALUE)
 
 
+@event_class
 class Partial(Op):
-    __slots__ = ("_left_args",)
+    _left_args: tuple[Any, ...]
 
     def __init__(self, *left_args, source=None):
         Op.__init__(self, source)
@@ -66,8 +75,9 @@ class Partial(Op):
         self.emit(*(self._left_args + args))
 
 
+@event_class
 class PartialRight(Op):
-    __slots__ = ("_right_args",)
+    _right_args: tuple[Any, ...]
 
     def __init__(self, *right_args, source=None):
         Op.__init__(self, source)
@@ -77,22 +87,21 @@ class PartialRight(Op):
         self.emit(*(args + self._right_args))
 
 
+@event_class
 class Star(Op):
-    __slots__ = ()
-
     def on_source(self, arg):
         self.emit(*arg)
 
 
+@event_class
 class Pack(Op):
-    __slots__ = ()
-
     def on_source(self, *args):
         self.emit(args)
 
 
+@event_class
 class Pluck(Op):
-    __slots__ = ("_selections",)
+    _selections: list[Any]
 
     def __init__(self, *selections, source=None):
         Op.__init__(self, source)
@@ -126,8 +135,10 @@ class Pluck(Op):
         self.emit(*values)
 
 
+@event_class
 class Previous(Op):
-    __slots__ = ("_count", "_q")
+    _count: int
+    _q: deque[Any]
 
     def __init__(self, count=1, source=None):
         Op.__init__(self, source)
@@ -140,22 +151,22 @@ class Previous(Op):
             self.emit(*self._q.popleft())
 
 
+@event_class
 class Copy(Op):
-    __slots__ = ()
-
     def on_source(self, *args):
         self.emit(*(copy.copy(a) for a in args))
 
 
+@event_class
 class Deepcopy(Op):
-    __slots__ = ()
-
     def on_source(self, *args):
         self.emit(*copy.deepcopy(args))
 
 
+@event_class
 class Chunk(Op):
-    __slots__ = ("_size", "_list")
+    _size: int
+    _list: list[Any]
 
     def __init__(self, size, source=None):
         Op.__init__(self, source)
@@ -175,8 +186,11 @@ class Chunk(Op):
         Op.on_source_done(self, self._source)
 
 
+@event_class
 class ChunkWith(Op):
-    __slots__ = ("_timer", "_list", "_emit_empty")
+    _timer: Event | None
+    _list: list[Any] | None
+    _emit_empty: bool
 
     def __init__(self, timer, emit_empty, source=None):
         Op.__init__(self, source)
@@ -207,8 +221,14 @@ class ChunkWith(Op):
         Op.on_source_done(self, self._source)
 
 
+@event_class
 class Map(Op):
-    __slots__ = ("_func", "_timeout", "_ordered", "_task_limit", "_coro_q", "_tasks")
+    _func: Callable[..., Any]
+    _timeout: float
+    _ordered: bool
+    _task_limit: int | None
+    _coro_q: deque[Any]
+    _tasks: deque[asyncio.Future[Any]]
 
     def __init__(self, func, timeout=0, ordered=True, task_limit=None, source=None):
         Op.__init__(self, source)
@@ -283,11 +303,10 @@ class Map(Op):
         self.emit(result)
 
 
+@event_class
 class Emap(Op):
-    __slots__ = (
-        "_constr",
-        "_joiner",
-    )
+    _constr: Callable[..., Any]
+    _joiner: Event | None
 
     def __init__(self, constr, joiner, source=None):
         Op.__init__(self, source)
@@ -313,29 +332,25 @@ class Emap(Op):
         self.set_done()
 
 
+@event_class
 class Mergemap(Emap):
-    __slots__ = ()
-
     def __init__(self, constr, source=None):
         Emap.__init__(self, constr, Merge(), source)
 
 
+@event_class
 class Chainmap(Emap):
-    __slots__ = ()
-
     def __init__(self, constr, source=None):
         Emap.__init__(self, constr, Chain(), source)
 
 
+@event_class
 class Concatmap(Emap):
-    __slots__ = ()
-
     def __init__(self, constr, source=None):
         Emap.__init__(self, constr, Concat(), source)
 
 
+@event_class
 class Switchmap(Emap):
-    __slots__ = ()
-
     def __init__(self, constr, source=None):
         Emap.__init__(self, constr, Switch(), source)

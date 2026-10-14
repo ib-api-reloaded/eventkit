@@ -1,22 +1,29 @@
+from __future__ import annotations
+
 import itertools
 import operator
 from collections import deque
+from collections.abc import Callable
+from typing import Any as AnyType
 
+from ..event import event_class
 from ..util import NO_VALUE
 from .op import Op
 from .transform import Iterate
 
 
+@event_class
 class Count(Iterate):
-    __slots__ = ()
-
     def __init__(self, start=0, step=1, source=None):
         it = itertools.count(start, step)
         Iterate.__init__(self, it, source)
 
 
+@event_class
 class Reduce(Op):
-    __slots__ = ("_func", "_initializer", "_prev")
+    _func: Callable[[AnyType, AnyType], AnyType]
+    _initializer: AnyType
+    _prev: AnyType
 
     def __init__(self, func, initializer=NO_VALUE, source=None):
         Op.__init__(self, source)
@@ -36,36 +43,34 @@ class Reduce(Op):
             self.emit(self._prev)
 
 
+@event_class
 class Min(Reduce):
-    __slots__ = ()
-
     def __init__(self, source=None):
         Reduce.__init__(self, min, float("inf"), source)
 
 
+@event_class
 class Max(Reduce):
-    __slots__ = ()
-
     def __init__(self, source=None):
         Reduce.__init__(self, max, -float("inf"), source)
 
 
+@event_class
 class Sum(Reduce):
-    __slots__ = ()
-
     def __init__(self, start=0, source=None):
         Reduce.__init__(self, operator.add, start, source)
 
 
+@event_class
 class Product(Reduce):
-    __slots__ = ()
-
     def __init__(self, start=1, source=None):
         Reduce.__init__(self, operator.mul, start, source)
 
 
+@event_class
 class Mean(Op):
-    __slots__ = ("_count", "_sum")
+    _count: int
+    _sum: float
 
     def __init__(self, source=None):
         Op.__init__(self, source)
@@ -78,22 +83,23 @@ class Mean(Op):
         self.emit(self._sum / self._count)
 
 
+@event_class
 class Any(Reduce):
-    __slots__ = ()
-
     def __init__(self, source=None):
         Reduce.__init__(self, lambda prev, v: prev or bool(v), False, source)
 
 
+@event_class
 class All(Reduce):
-    __slots__ = ()
-
     def __init__(self, source=None):
         Reduce.__init__(self, lambda prev, v: prev and bool(v), True, source)
 
 
+@event_class
 class Ema(Op):
-    __slots__ = ("_f1", "_f2", "_prev")
+    _f1: float
+    _f2: float
+    _prev: AnyType
 
     def __init__(self, n=None, weight=None, source=None):
         Op.__init__(self, source)
@@ -110,8 +116,10 @@ class Ema(Op):
         self.emit(*value)
 
 
+@event_class
 class Pairwise(Op):
-    __slots__ = ("_prev", "_has_prev")
+    _prev: AnyType
+    _has_prev: bool
 
     def __init__(self, source=None):
         Op.__init__(self, source)
@@ -126,8 +134,9 @@ class Pairwise(Op):
         self._prev = value
 
 
+@event_class
 class List(Op):
-    __slots__ = "_values"
+    _values: list[AnyType]
 
     def __init__(self, source=None):
         Op.__init__(self, source)
@@ -141,8 +150,10 @@ class List(Op):
         Op.on_source_done(self, source)
 
 
+@event_class
 class Deque(Op):
-    __slots__ = ("_count", "_q")
+    _count: int
+    _q: deque[AnyType]
 
     def __init__(self, count, source=None):
         Op.__init__(self, source)

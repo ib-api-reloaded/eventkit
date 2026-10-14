@@ -507,3 +507,43 @@ def test_throttle_delivers_everything_in_order_within_the_limit(
         assert len(in_window) <= allowed, (t, in_window)
     for (t_out, _), t_in in zip(out, times):
         assert t_out >= t_in
+
+
+@given(VALUES)
+def test_unique_by_key(values):
+    seen, expected = set(), []
+    for v in values:  # the first value of each key
+        if abs(v) not in seen:
+            seen.add(abs(v))
+            expected.append(v)
+    assert collect(lambda: Event.sequence(values).unique(key=abs)) == expected
+
+
+@given(VALUES)
+def test_errors_ends_with_its_source(values):
+    with virtual_loop() as loop, no_logged_errors():
+        source = Event("source")
+        errors = source.errors()
+        seen = []
+        errors.connect(lambda *args: seen.append(args))
+        failure = ValueError("x")
+        source.error_event.emit(source, failure)
+        source.set_done()
+        loop.run_until_complete(asyncio.sleep(0))
+        assert seen == [(source, failure)]
+        assert errors.done()
+
+
+@given(VALUES)
+def test_ziplatest_keeps_positions_when_a_source_has_ended(values):
+    with virtual_loop(), no_logged_errors():
+        ended = Event("ended")
+        ended.emit("final")
+        ended.set_done()
+        live = Event("live")
+        out = []
+        zipped = ended.ziplatest(live)
+        zipped.connect(lambda *args: out.append(args))
+        for v in values:
+            live.emit(v)
+        assert out == [("final", v) for v in values]

@@ -10,7 +10,8 @@ from collections.abc import AsyncIterable, Awaitable, Callable, Iterable
 from dataclasses import dataclass, field
 from typing import Any as AnyType
 from typing import (
-    Final,
+    ClassVar,
+    TypeVar,
 )
 
 from .util import (
@@ -22,6 +23,8 @@ from .util import (
 )
 
 logger: logging.Logger = logging.getLogger(__name__)
+
+_E = TypeVar("_E")
 
 
 # Links from an event to the events feeding it: an operator's source, a
@@ -176,7 +179,17 @@ class Slots:
                     )
 
 
-@dataclass(slots=False)
+def event_class(cls: type[_E]) -> type[_E]:
+    """Make ``cls`` a slotted dataclass in the :class:`Event` family.
+
+    Events are compared and hashed by identity (an event is a thing, not
+    a value), have no generated ``repr``, and keep their hand-written
+    ``__init__``, so every constructor keeps its public signature.
+    """
+    return dataclass(slots=True, eq=False, repr=False, init=False)(cls)
+
+
+@dataclass(slots=True, eq=False, repr=False, init=False, weakref_slot=True)
 class Event:
     """
     Enable event passing between loosely coupled components.
@@ -187,41 +200,37 @@ class Event:
         name: Name to use for this event.
     """
 
-    _name: str = ""
-    _with_error_done_events: bool = True
+    _name: str
+    _with_error_done_events: bool
 
     # Sub event that emits errors from this event as ``emit(source, exception)``.
-    error_event: Event | None = None
+    error_event: Event | None
 
     # Sub event that emits when this event is done as ``emit(source)``.
-    done_event: Event | None = None
+    done_event: Event | None
 
-    _value: AnyType = NO_VALUE
-    _slots: Final[Slots] = field(default_factory=Slots)
-    _done: bool = False
-    _source: Event | None = None
-    __weakref__: AnyType = None
-    _task: AnyType = None
+    _value: AnyType
+    _slots: Slots
+    _done: bool
+    _source: Event | None
+    _task: AnyType
 
-    NO_VALUE: Final[_NoValue] = NO_VALUE
+    NO_VALUE: ClassVar[_NoValue] = NO_VALUE
 
-    def __post_init__(self) -> None:
-        if self._with_error_done_events:
+    def __init__(self, name: str = "", _with_error_done_events: bool = True):
+        self._name = name or type(self).__qualname__
+        self._with_error_done_events = _with_error_done_events
+        self._value = NO_VALUE
+        self._slots = Slots()
+        self._done = False
+        self._source = None
+        self._task = None
+        if _with_error_done_events:
             self.error_event = Event("error", False)
             self.done_event = Event("done", False)
-
-        if not self._name:
-            self._name = self.__class__.__qualname__
-
-    def __hash__(self) -> int:
-        return hash(
-            (
-                self.name,
-                self._with_error_done_events,
-                self.error_event,
-                self.done_event,
-            )
-        )
+        else:
+            self.error_event = None
+            self.done_event = None
 
     def name(self) -> str:
         """

@@ -1,9 +1,16 @@
+from __future__ import annotations
+
+from collections.abc import Callable, Hashable
+from typing import Any
+
+from ..event import Event, event_class
 from ..util import NO_VALUE
 from .op import Op
 
 
+@event_class
 class Filter(Op):
-    __slots__ = ("_predicate",)
+    _predicate: Callable[..., Any]
 
     def __init__(self, predicate=bool, source=None):
         Op.__init__(self, source)
@@ -14,8 +21,10 @@ class Filter(Op):
             self.emit(*args)
 
 
+@event_class
 class Skip(Op):
-    __slots__ = ("_count", "_n")
+    _count: int
+    _n: int
 
     def __init__(self, count=1, source=None):
         Op.__init__(self, source)
@@ -31,8 +40,10 @@ class Skip(Op):
             self.emit(*args)
 
 
+@event_class
 class Take(Op):
-    __slots__ = ("_count", "_n")
+    _count: int
+    _n: int
 
     def __init__(self, count=1, source=None):
         Op.__init__(self, source)
@@ -48,8 +59,9 @@ class Take(Op):
             self.set_done()
 
 
+@event_class
 class TakeWhile(Op):
-    __slots__ = ("_predicate",)
+    _predicate: Callable[..., Any]
 
     def __init__(self, predicate=bool, source=None):
         Op.__init__(self, source)
@@ -63,8 +75,10 @@ class TakeWhile(Op):
             self._disconnect_from(self._source)
 
 
+@event_class
 class DropWhile(Op):
-    __slots__ = ("_predicate", "_drop")
+    _predicate: Callable[..., Any]
+    _drop: bool
 
     def __init__(self, predicate=lambda x: not x, source=None):
         Op.__init__(self, source)
@@ -78,8 +92,9 @@ class DropWhile(Op):
             self.emit(*args)
 
 
+@event_class
 class TakeUntil(Op):
-    __slots__ = ("_notifier",)
+    _notifier: Event | None
 
     def __init__(self, notifier, source=None):
         Op.__init__(self, source)
@@ -97,8 +112,9 @@ class TakeUntil(Op):
         self._notifier = None
 
 
+@event_class
 class Changes(Op):
-    __slots__ = ("_prev",)
+    _prev: Any
 
     def __init__(self, source=None):
         Op.__init__(self, source)
@@ -110,8 +126,10 @@ class Changes(Op):
         self._prev = args
 
 
+@event_class
 class Unique(Op):
-    __slots__ = ("_key", "_seen")
+    _key: Callable[..., Hashable] | None
+    _seen: set[Hashable]
 
     def __init__(self, key, source=None):
         Op.__init__(self, source)
@@ -119,17 +137,15 @@ class Unique(Op):
         self._seen = set()
 
     def on_source(self, *args):
-        if self._key is None:
-            new = args not in self._seen
-        else:
-            new = self._key(*args) not in self._seen
-        self._seen.add(args)
-        if new:
+        group = args if self._key is None else self._key(*args)
+        if group not in self._seen:
+            self._seen.add(group)
             self.emit(*args)
 
 
+@event_class
 class Last(Op):
-    __slots__ = ("_last",)
+    _last: Any
 
     def __init__(self, source=None):
         Op.__init__(self, source)

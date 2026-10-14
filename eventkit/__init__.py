@@ -1,6 +1,6 @@
 """Event-driven data pipelines."""
 
-from .event import Event, logger
+from .event import Event, event_class, logger
 from .ops.aggregate import (
     All,
     Any,
@@ -86,6 +86,7 @@ from .version import __version__, __version_info__
 
 __all__ = [
     "Event",
+    "event_class",
     "logger",
     "All",
     "Any",

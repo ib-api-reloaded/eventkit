@@ -1,48 +1,53 @@
+from __future__ import annotations
+
 import functools
 from collections import defaultdict, deque
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import Any
 
-from ..event import Event
+from ..event import Event, event_class
 from ..util import NO_VALUE
 from .op import Op
 
 
+@dataclass(slots=True, eq=False, repr=False, init=False)
 class Fork(list):
-    __slots__ = ()
+    """The targets of :meth:`Event.fork`, to be joined into one event."""
 
     def __init__(self):
         list.__init__(self)
 
-    def join(self, joiner: "JoinOp"):
+    def join(self, joiner: JoinOp):
         joiner._set_sources(*self)
         self.clear()
         return joiner
 
-    def concat(self) -> "Concat":
+    def concat(self) -> Concat:
         return self.join(Concat())
 
-    def merge(self) -> "Merge":
+    def merge(self) -> Merge:
         return self.join(Merge())
 
-    def switch(self) -> "Switch":
+    def switch(self) -> Switch:
         return self.join(Switch())
 
-    def zip(self) -> "Zip":
+    def zip(self) -> Zip:
         return self.join(Zip())
 
-    def ziplatest(self) -> "Ziplatest":
+    def ziplatest(self) -> Ziplatest:
         return self.join(Ziplatest())
 
-    def chain(self) -> "Chain":
+    def chain(self) -> Chain:
         return self.join(Chain())
 
 
+@event_class
 class JoinOp(Op):
     """
     Base class for join operators that combine the emits
     from multiple source events.
     """
-
-    __slots__ = ("_sources",)
 
     _sources: deque[Event]
 
@@ -50,13 +55,12 @@ class JoinOp(Op):
         raise NotImplementedError
 
 
+@event_class
 class AddableJoinOp(JoinOp):
     """
     Base class for join operators where new sources, produced by a
     parent higher-order event, can be added dynamically.
     """
-
-    __slots__ = ("_parent",)
 
     _parent: Event | None
 
@@ -93,16 +97,17 @@ class AddableJoinOp(JoinOp):
             self.set_done()
 
 
+@event_class
 class Merge(AddableJoinOp):
-    __slots__ = ()
-
     def add_source(self, source):
         self._sources.append(source)
         self._connect_from(source)
 
 
+@event_class
 class Switch(AddableJoinOp):
-    __slots__ = ("_source2cb", "_active_source")
+    _source2cb: dict[Event, Callable[..., None]]
+    _active_source: Event | None
 
     def __init__(self, *sources):
         AddableJoinOp.__init__(self)
@@ -141,8 +146,9 @@ class Switch(AddableJoinOp):
             self.set_done()
 
 
+@event_class
 class Concat(AddableJoinOp):
-    __slots__ = ("_source2cb",)
+    _source2cb: dict[Event, Callable[..., None]]
 
     def __init__(self, *sources):
         AddableJoinOp.__init__(self)
@@ -176,8 +182,10 @@ class Concat(AddableJoinOp):
             self.set_done()
 
 
+@event_class
 class Chain(AddableJoinOp):
-    __slots__ = ("_qq", "_source2cbs")
+    _qq: deque[deque[tuple[Any, ...]]]
+    _source2cbs: defaultdict[Event, list[Callable[..., None]]]
 
     def __init__(self, *sources):
         AddableJoinOp.__init__(self)
@@ -220,8 +228,11 @@ class Chain(AddableJoinOp):
             self.set_done()
 
 
+@event_class
 class Zip(JoinOp):
-    __slots__ = ("_results", "_source2cbs", "_num_ready")
+    _results: list[deque[Any]]
+    _source2cbs: defaultdict[Event, list[Callable[..., None]]] | None
+    _num_ready: int
 
     def __init__(self, *sources):
         JoinOp.__init__(self)
@@ -264,8 +275,11 @@ class Zip(JoinOp):
             self.set_done()
 
 
+@event_class
 class Ziplatest(JoinOp):
-    __slots__ = ("_values", "_is_primed", "_source2cbs")
+    _values: list[Any]
+    _is_primed: bool
+    _source2cbs: defaultdict[Event, list[Callable[..., None]]] | None
 
     def __init__(self, *sources, partial=True):
         JoinOp.__init__(self)
@@ -280,8 +294,12 @@ class Ziplatest(JoinOp):
         if not self._sources:
             self.set_done()
             return
+        # One position per source, finished ones included (they keep their
+        # last value); callbacks index into these positions.
         self._values = [s.value() for s in sources]
-        for i, source in enumerate(self._sources):
+        for i, source in enumerate(sources):
+            if source.done():
+                continue
             cb = functools.partial(self._on_source_i, i)
             source.connect(cb, self.on_source_error, self.on_source_done)
             self._source2cbs[source].append(cb)

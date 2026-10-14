@@ -1,12 +1,21 @@
-from collections import deque
+from __future__ import annotations
 
-from ..event import Event
+import asyncio
+from collections import deque
+from collections.abc import Callable
+from typing import Any
+
+from ..event import Event, event_class
 from ..util import NO_VALUE, get_event_loop
 from .op import Op
 
 
+@event_class
 class Delay(Op):
-    __slots__ = ("_delay", "_pending", "_handle")
+    _delay: float
+    # (deadline, callback, args) in arrival order
+    _pending: deque[tuple[float, Callable[..., Any], tuple[Any, ...]]]
+    _handle: asyncio.TimerHandle | None
 
     def __init__(self, delay, source=None):
         Op.__init__(self, source)
@@ -57,8 +66,11 @@ class Delay(Op):
                 self._handle = loop.call_at(pending[0][0], self._release)
 
 
+@event_class
 class Timeout(Op):
-    __slots__ = ("_timeout", "_handle", "_last_time")
+    _timeout: float
+    _handle: asyncio.TimerHandle | None
+    _last_time: float
 
     def __init__(self, timeout, source=None):
         Op.__init__(self, source)
@@ -101,8 +113,12 @@ class Timeout(Op):
             self._schedule()
 
 
+@event_class
 class Debounce(Op):
-    __slots__ = ("_interval", "_on_first", "_handle", "_last_time")
+    _interval: float
+    _on_first: bool
+    _handle: asyncio.TimerHandle | None
+    _last_time: float
 
     def __init__(self, interval, on_first=False, source=None):
         Op.__init__(self, source)
@@ -139,18 +155,17 @@ class Debounce(Op):
             self.set_done()
 
 
+@event_class
 class Throttle(Op):
-    __slots__ = (
-        "status_event",
-        "_maximum",
-        "_interval",
-        "_cost_func",
-        "_q",
-        "_time_q",
-        "_cost_q",
-        "_is_throttling",
-        "_handle",
-    )
+    status_event: Event
+    _maximum: float
+    _interval: float
+    _cost_func: Callable[..., float] | None
+    _q: deque[tuple[tuple[Any, ...], float | None]]
+    _time_q: deque[float]
+    _cost_q: deque[float | None]
+    _is_throttling: bool
+    _handle: asyncio.TimerHandle | None
 
     def __init__(self, maximum, interval, cost_func=None, source=None):
         Op.__init__(self, source)
@@ -243,8 +258,9 @@ class Throttle(Op):
             self.status_event.set_done()
 
 
+@event_class
 class Sample(Op):
-    __slots__ = ("_timer",)
+    _timer: Event | None
 
     def __init__(self, timer, source=None):
         Op.__init__(self, source)
