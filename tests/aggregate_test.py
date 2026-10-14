@@ -1,3 +1,4 @@
+import importlib.util
 import unittest
 
 from eventkit import Event
@@ -48,6 +49,9 @@ class AggregateTest(VirtualClockTestCase, unittest.TestCase):
         event = Event.sequence(array, 0.01).chunkwith(timer)
         self.assertEqual(event.run(), [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9]])
 
+    @unittest.skipUnless(
+        importlib.util.find_spec("numpy"), "needs the numpy extra (aeventkit[numpy])"
+    )
     def test_array(self):
         event = Event.sequence(array).array(5).last()
         self.assertEqual(list(event.run()[0]), array[-5:])
