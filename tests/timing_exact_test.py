@@ -32,3 +32,10 @@ class DelayTest(VirtualClockTestCase, unittest.TestCase):
         ]
         self.assertEqual(len(timers), 1)
 
+
+class TimeoutTest(VirtualClockTestCase, unittest.TestCase):
+    def test_expires_exactly_at_its_deadline(self):
+        event = Event.sequence([1, 2, 3], interval=0.1).timeout(0.01)
+        self.assertEqual(event.run(), [1, Event.NO_VALUE])
+        self.assertEqual(self.loop.time(), 0.01)
+

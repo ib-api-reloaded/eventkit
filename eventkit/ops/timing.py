@@ -85,8 +85,10 @@ class Timeout(Op):
         self._handle = loop.call_at(self._last_time + self._timeout, self._on_timer)
 
     def _on_timer(self):
-        loop = get_event_loop()
-        if loop.time() - self._last_time > self._timeout:
+        # Expired unless a value arrived after this timer was set: compare
+        # with the deadline the timer was scheduled for, not the clock,
+        # which asyncio may read up to one clock tick before it.
+        if self._last_time + self._timeout <= self._handle.when():
             self.emit()
             self.set_done()
         else:
