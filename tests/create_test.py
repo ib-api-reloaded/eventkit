@@ -54,3 +54,8 @@ class SourceTimingTest(VirtualClockTestCase, unittest.TestCase):
     def test_timer(self):
         self.assertEqual(Event.timer(0.25, count=3).run(), [0.25, 0.5, 0.75])
         self.assertEqual(self.loop.time(), 0.75)
+
+    def test_repeat(self):
+        self.assertEqual(Event.repeat("x", count=3).run(), ["x", "x", "x"])
+        event = Event.repeat(7, count=3, interval=0.5)
+        self.assertEqual(self.emitTimes(event), [0.0, 0.5, 1.0])
