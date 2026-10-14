@@ -6,26 +6,55 @@ from .op import Op
 
 
 class Delay(Op):
-    __slots__ = ("_delay",)
+    __slots__ = ("_delay", "_pending", "_handle")
 
     def __init__(self, delay, source=None):
         Op.__init__(self, source)
         self._delay = delay
+        # (deadline, callback, args) in arrival order; deadlines never
+        # decrease, so the head is always the next one due.
+        self._pending = deque()
+        self._handle = None  # the one timer, set for the head's deadline
 
     def on_source(self, *args):
-        loop = get_event_loop()
-        loop.call_later(self._delay, self.emit, *args)
+        self._schedule(self.emit, args)
 
     def on_source_error(self, error):
-        loop = get_event_loop()
-        loop.call_later(self._delay, self.error_event.emit, error)
+        self._schedule(self.error_event.emit, (error,))
 
     def on_source_done(self, source):
         if self._source is not None:
             self._disconnect_from(self._source)
             self._source = None
+        self._schedule(self.set_done, ())
+
+    def _schedule(self, callback, args):
         loop = get_event_loop()
-        loop.call_later(self._delay, self.set_done)
+        self._pending.append((loop.time() + self._delay, callback, args))
+        if self._handle is None:
+            self._handle = loop.call_at(self._pending[0][0], self._release)
+
+    def _release(self):
+        """Release the head (its timer just fired) and everything else
+        already due, in arrival order, then re-arm for the next head.
+
+        One ordered queue instead of a timer per value: asyncio does not
+        run timers with equal deadlines in scheduling order, so separate
+        timers could reorder values, or complete before the last value.
+        """
+        loop = get_event_loop()
+        pending = self._pending
+        deadline, callback, args = pending.popleft()
+        limit = max(deadline, loop.time())
+        self._handle = None
+        try:
+            callback(*args)
+            while pending and pending[0][0] <= limit:
+                _, callback, args = pending.popleft()
+                callback(*args)
+        finally:
+            if pending and self._handle is None:
+                self._handle = loop.call_at(pending[0][0], self._release)
 
 
 class Timeout(Op):
