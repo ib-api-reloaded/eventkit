@@ -5,6 +5,7 @@ description = "Event-driven data pipelines"
 readme = "README.rst"
 requires-python = ">=3.11"
 license = "BSD-3-Clause"
+license-files = ["LICENSE"]
 authors = [{ name = "Ewald R. de Wit" }]
 keywords = ["python", "asyncio", "event", "driven", "data", "pipelines"]
 classifiers = [
@@ -25,7 +26,7 @@ Repository = "https://github.com/ib-api-reloaded/eventkit"
 "Bug Tracker" = "https://github.com/ib-api-reloaded/eventkit/issues"
 
 [project.optional-dependencies]
-numpy = ["numpy (>=2.4.4,<3.0.0)"]
+numpy = ["numpy>=2.4.4,<3.0.0"]
 
 [dependency-groups]
 dev = [
@@ -45,36 +46,17 @@ docs = [
     "sphinxcontrib-napoleon>=0.7,<0.8",
 ]
 
-[tool.poetry]
-# Because we renamed the pypi top-level package to `aeventkit` but we still want to `import eventkit`
-# we need to have `packages` for `eventkit` so it can find it with our _name_ being `aeventkit` now.
-packages = [{ include = "eventkit" }]
-
-[tool.poetry.group.dev]
-optional = true
-
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.17.0"
-pre-commit = "^3.5.0"
-pytest = "^8.4.1"
-pytest-xdist = "^3.6.1"
-mypy = "^1.20.0"
-pytest-cov = "^6.2.1"
-pytest-asyncio = "^1.0.0"
-pytest-timeout = "^2.3.1"
-
-[tool.poetry.group.docs]
-optional = true
-
-[tool.poetry.group.docs.dependencies]
-sphinx-autodoc-typehints = "^2.0.0"
-sphinx-rtd-theme = "^2.0.0"
-myst-parser = "^2.0.0"
-sphinxcontrib-napoleon = "^0.7"
-
 [build-system]
-requires = ["poetry-core>=2.0.0"]
-build-backend = "poetry.core.masonry.api"
+requires = ["uv_build>=0.10.10,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+# Published as `aeventkit` but imported as `eventkit`, from the repo root.
+module-name = "eventkit"
+module-root = ""
+# Local tool output that can sit inside the package directory.
+wheel-exclude = ["**/.DS_Store", "**/.ruff_cache", "**/.mypy_cache", "eventkit/tags"]
+source-exclude = ["**/.DS_Store", "**/.ruff_cache", "**/.mypy_cache", "eventkit/tags"]
 
 [tool.ruff]
 line-length = 88

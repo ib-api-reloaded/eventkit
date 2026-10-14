@@ -241,7 +241,7 @@ Extend the base `Event` class for specialized event types with custom behavior.
 
 ### Development Tools
 
-- **Poetry**: Dependency management and packaging
+- **uv**: Dependency management, builds (`uv_build` backend) and per-version test environments
 - **Ruff**: Code formatting and linting
 - **MyPy**: Type checking
 - **Pytest**: Testing framework with asyncio support
