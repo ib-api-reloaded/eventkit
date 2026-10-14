@@ -9,6 +9,8 @@ import warnings
 from eventkit import Event
 from eventkit.util import get_event_loop
 
+from .virtual_clock import VirtualClockTestCase
+
 
 class GetEventLoopTest(unittest.TestCase):
     def setUp(self):
@@ -111,3 +113,24 @@ class GetEventLoopTest(unittest.TestCase):
         asyncio.set_event_loop(loop)
         result = Event.sequence([1]).map(lambda _: asyncio.get_running_loop()).run()
         self.assertEqual(result, [loop])
+
+
+class EventRunScopeTest(VirtualClockTestCase, unittest.TestCase):
+    """``Event.run`` cleans up its own pipeline and nothing else."""
+
+    def test_unrelated_task_on_the_loop_survives(self):
+        async def unrelated():
+            await asyncio.sleep(60)
+
+        task = self.loop.create_task(unrelated())
+        self.assertEqual(Event.sequence([1, 2, 3]).run(), [1, 2, 3])
+        self.assertFalse(task.done())
+        task.cancel()
+        self.loop.run_until_complete(asyncio.gather(task, return_exceptions=True))
+
+    def test_pipeline_source_outliving_the_event_is_stopped(self):
+        source = Event.sequence([1, 2, 3], interval=1.0)
+        result = source.timeout(0.5).run()
+        self.assertEqual(result, [1, Event.NO_VALUE])
+        self.assertTrue(source._task is None or source._task.done())
+

@@ -18,6 +18,33 @@ from .util import NO_VALUE, _NoValue, get_event_loop, schedule_awaitable
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+def _pipeline_tasks(event: Event) -> set[asyncio.Task]:
+    """Unfinished tasks owned by ``event`` and every event upstream of it.
+
+    Upstream links are an operator's ``_source``, a join's ``_sources`` and
+    a higher-order join's ``_parent``; tasks are a source's ``_task`` and
+    an async map's ``_tasks``.
+    """
+    tasks: set[asyncio.Task] = set()
+    seen: set[int] = set()
+    stack = [event]
+    while stack:
+        node = stack.pop()
+        if id(node) in seen:
+            continue
+        seen.add(id(node))
+        task = getattr(node, "_task", None)
+        if task is not None and not task.done():
+            tasks.add(task)
+        tasks.update(t for t in getattr(node, "_tasks", ()) if not t.done())
+        for attr in ("_source", "_parent"):
+            upstream = getattr(node, attr, None)
+            if upstream is not None:
+                stack.append(upstream)
+        stack.extend(getattr(node, "_sources", ()))
+    return tasks
+
+
 @dataclass(slots=True)
 class Slot:
     obj: AnyType
@@ -341,27 +368,21 @@ class Event:
                 "asyncio event loop. Use 'await event.list()' instead."
             )
 
+        # Tasks this event's own pipeline started (sources, async maps);
+        # collected now, while every upstream link is still connected.
+        owned = _pipeline_tasks(self)
+
         async def _run_and_clean():
-            # This coroutine will be run to completion.
-            result = await self.list()
-
-            # Now, perform the explicit cleanup of any other background tasks.
-            current_loop = asyncio.get_running_loop()
-            all_tasks = asyncio.all_tasks(loop=current_loop)
-            current_task = asyncio.current_task(loop=current_loop)
-
-            pending_tasks = [
-                task
-                for task in all_tasks
-                if task is not current_task and not task.done()
-            ]
-
-            if pending_tasks:
-                for task in pending_tasks:
+            try:
+                return await self.list()
+            finally:
+                # The pipeline may have ended before some of its sources
+                # did (e.g. ``timeout``): stop what is left of it, and
+                # only that, so unrelated work on the loop keeps running.
+                leftover = [t for t in owned | _pipeline_tasks(self) if not t.done()]
+                for task in leftover:
                     task.cancel()
-                await asyncio.gather(*pending_tasks, return_exceptions=True)
-
-            return result
+                await asyncio.gather(*leftover, return_exceptions=True)
 
         return loop.run_until_complete(_run_and_clean())
 
