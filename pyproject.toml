@@ -95,3 +95,13 @@ asyncio_default_test_loop_scope = "session"
 [[tool.mypy.overrides]]
 module = ["numpy"]
 ignore_missing_imports = true
+
+[tool.releasekit]
+import-name = "eventkit"
+smoke = "eventkit.Event('smoke').emit(1)"
+checks = ["make lint", "make test"]
+
+[tool.releasekit.matrix]
+python = ["3.11", "3.12", "3.13", "3.14", "3.15"]
+command = "make test"
+timeout = 300
