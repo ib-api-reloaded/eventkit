@@ -13,42 +13,74 @@ from typing import (
     Final,
 )
 
-from .util import NO_VALUE, _NoValue, get_event_loop, schedule_awaitable
+from .util import (
+    NO_VALUE,
+    _NoValue,
+    get_event_loop,
+    main_thread_loop,
+    schedule_awaitable,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-def _pipeline_tasks(event: Event) -> set[asyncio.Task]:
-    """Unfinished tasks owned by ``event`` and every event upstream of it.
+# Links from an event to the events feeding it: an operator's source, a
+# higher-order join's parent, and side inputs (``sample``'s timer,
+# ``take_until``'s notifier, ``chunkwith``'s timer, ``emap``'s joiner).
+_UPSTREAM_LINKS = ("_source", "_parent", "_timer", "_notifier", "_joiner")
 
-    Upstream links are an operator's ``_source``, a join's ``_sources`` and
-    a higher-order join's ``_parent``; tasks are a source's ``_task`` and
-    an async map's ``_tasks``.
+
+def _pipeline_tasks(event: Event) -> set[asyncio.Task]:
+    """Unfinished tasks of ``event`` and the events upstream of it that
+    only this pipeline uses.
+
+    Tasks are a source's ``_task`` and an async map's ``_tasks``. An
+    upstream event that also has a listener outside the pipeline (another
+    pipeline, a plain callback) is in use elsewhere, so its tasks are not
+    included.
     """
-    tasks: set[asyncio.Task] = set()
-    seen: set[int] = set()
+    nodes: dict[int, Event] = {}
     stack = [event]
     while stack:
         node = stack.pop()
-        if id(node) in seen:
+        if id(node) in nodes:
             continue
-        seen.add(id(node))
+        nodes[id(node)] = node
+        for attr in _UPSTREAM_LINKS:
+            upstream = getattr(node, attr, None)
+            if isinstance(upstream, Event):
+                stack.append(upstream)
+        stack.extend(getattr(node, "_sources", ()))
+
+    tasks: set[asyncio.Task] = set()
+    for node in nodes.values():
+        if not _listened_to_only_by(node, nodes):
+            continue
         task = getattr(node, "_task", None)
         if task is not None and not task.done():
             tasks.add(task)
         tasks.update(t for t in getattr(node, "_tasks", ()) if not t.done())
-        for attr in ("_source", "_parent"):
-            upstream = getattr(node, attr, None)
-            if upstream is not None:
-                stack.append(upstream)
-        stack.extend(getattr(node, "_sources", ()))
     return tasks
+
+
+def _listened_to_only_by(event: Event, nodes: dict[int, Event]) -> bool:
+    """Whether every live listener of ``event`` is one of ``nodes``."""
+    for slot in event._slots.slots:
+        if slot.weakref is not None:
+            owner = slot.weakref()
+            if owner is None:
+                continue  # collected
+        else:
+            owner = slot.obj
+        if owner is None or id(owner) not in nodes:
+            return False  # a plain callback, or an event outside
+    return True
 
 
 @dataclass(slots=True)
 class Slot:
     obj: AnyType
-    weakref: Callable[[AnyType], AnyType] | None
+    weakref: Callable[[], AnyType] | None
     func: Callable[[AnyType], AnyType]
 
 
@@ -109,7 +141,14 @@ class Slots:
             func = slot.func
 
             try:
-                obj = ref() if ref else slot.obj
+                if ref is not None:
+                    obj = ref()
+                    if obj is None:
+                        # Collected, its slot not yet removed (during this
+                        # emit, or on PyPy until the weakref callback runs).
+                        continue
+                else:
+                    obj = slot.obj
 
                 result = None
                 if obj is None:
@@ -129,7 +168,7 @@ class Slots:
                 # It's not really clear in the documentation or usage that exceptions
                 # get returned via an 'error_event' callback. We should make sure
                 # people know this clearly so event handler callback errors are noticed.
-                if caller.error_event:
+                if caller.error_event is not None and len(caller.error_event):
                     caller.error_event.emit(caller, error)
                 else:
                     logger.exception(
@@ -331,7 +370,7 @@ class Event:
         Threadsafe version of :meth:`emit` that doesn't invoke the
         listeners directly but via the event loop of the main thread.
         """
-        get_event_loop().call_soon_threadsafe(self.emit, *args)
+        main_thread_loop().call_soon_threadsafe(self.emit, *args)
 
     def clear(self):
         """
@@ -356,30 +395,34 @@ class Event:
 
             ``run()`` raises ``RuntimeError`` when the thread's event loop
             is already running, as it is inside a Jupyter notebook or any
-            coroutine. Await the event there instead::
+            coroutine, unless the loop has been made re-entrant with
+            ``nest_asyncio.apply()``. Await the event there instead::
 
                 await event.list()
         """
         loop = get_event_loop()
 
-        if loop.is_running():
+        if loop.is_running() and not getattr(loop, "_nest_patched", False):
             raise RuntimeError(
                 "Event.run() cannot be called from within an already running "
                 "asyncio event loop. Use 'await event.list()' instead."
             )
 
+        collector = self.list()
         # Tasks this event's own pipeline started (sources, async maps);
         # collected now, while every upstream link is still connected.
-        owned = _pipeline_tasks(self)
+        owned = _pipeline_tasks(collector)
 
         async def _run_and_clean():
             try:
-                return await self.list()
+                return await collector
             finally:
                 # The pipeline may have ended before some of its sources
                 # did (e.g. ``timeout``): stop what is left of it, and
                 # only that, so unrelated work on the loop keeps running.
-                leftover = [t for t in owned | _pipeline_tasks(self) if not t.done()]
+                leftover = [
+                    t for t in owned | _pipeline_tasks(collector) if not t.done()
+                ]
                 for task in leftover:
                     task.cancel()
                 await asyncio.gather(*leftover, return_exceptions=True)
@@ -1391,7 +1434,9 @@ class Event:
             interval: Time interval (in seconds).
             cost_func: The sum of ``cost_func(value)`` for every
                 source value inside the ``interval`` that is to remain
-                under the ``maximum``. The default is to count every
+                under the ``maximum`` (a value whose cost alone reaches the
+                maximum is emitted on its own, once the interval holds no
+                other emits). The default is to count every
                 source value as 1.
         """
         return Throttle(maximum, interval, cost_func, self)

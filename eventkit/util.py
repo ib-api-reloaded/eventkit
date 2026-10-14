@@ -3,6 +3,7 @@
 import asyncio
 import datetime as dt
 import sys
+import threading
 import warnings
 from collections.abc import AsyncIterator
 from typing import Final
@@ -19,6 +20,8 @@ class _NoValue:
 
 
 NO_VALUE: Final = _NoValue()
+
+_MAIN_THREAD_ID: Final = threading.main_thread().ident
 
 
 if sys.version_info >= (3, 14):
@@ -64,13 +67,44 @@ def get_event_loop() -> asyncio.AbstractEventLoop:
     on any supported Python version.
     """
     try:
-        return asyncio.get_running_loop()
+        loop = asyncio.get_running_loop()
     except RuntimeError:
-        pass
-    loop = _thread_loop()
+        current = _thread_loop()
+        if current is None or current.is_closed():
+            current = asyncio.new_event_loop()
+            asyncio.set_event_loop(current)
+        loop = current
+    if threading.get_ident() == _MAIN_THREAD_ID:
+        _main_thread.loop = loop
+    return loop
+
+
+class _MainThread:
+    """The loop the main thread last used, for other threads to hand work
+    to (:func:`main_thread_loop`)."""
+
+    loop: asyncio.AbstractEventLoop | None = None
+
+
+_main_thread = _MainThread()
+
+
+def main_thread_loop() -> asyncio.AbstractEventLoop:
+    """The main thread's event loop, from any thread.
+
+    In the main thread this is :func:`get_event_loop`. In another thread
+    it is the loop the main thread last used through eventkit; a thread
+    never gets a loop of its own here, since nothing would run it.
+    """
+    if threading.get_ident() == _MAIN_THREAD_ID:
+        return get_event_loop()
+    loop = _main_thread.loop
     if loop is None or loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
+        raise RuntimeError(
+            "the main thread has no event loop in use by eventkit; "
+            "call emit_threadsafe from a thread once the main thread's "
+            "loop is set up"
+        )
     return loop
 
 

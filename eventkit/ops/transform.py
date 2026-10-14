@@ -279,7 +279,7 @@ class Map(Op):
             result = task.result()
         except Exception as error:
             result = NO_VALUE
-            self.error_event.emit(error)
+            self.error_event.emit(self, error)
         self.emit(result)
 
 

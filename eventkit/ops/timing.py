@@ -19,8 +19,8 @@ class Delay(Op):
     def on_source(self, *args):
         self._schedule(self.emit, args)
 
-    def on_source_error(self, error):
-        self._schedule(self.error_event.emit, (error,))
+    def on_source_error(self, source, error):
+        self._schedule(self.error_event.emit, (source, error))
 
     def on_source_done(self, source):
         if self._source is not None:
@@ -85,10 +85,16 @@ class Timeout(Op):
         self._handle = loop.call_at(self._last_time + self._timeout, self._on_timer)
 
     def _on_timer(self):
+        if self.done():
+            # Ended another way (e.g. attached to a finished source).
+            return
         # Expired unless a value arrived after this timer was set: compare
         # with the deadline the timer was scheduled for, not the clock,
         # which asyncio may read up to one clock tick before it.
         if self._last_time + self._timeout <= self._handle.when():
+            if self._source is not None:
+                self._disconnect_from(self._source)
+                self._source = None
             self.emit()
             self.set_done()
         else:
@@ -213,7 +219,9 @@ class Throttle(Op):
             else:
                 cost = None
                 total_cost = 1 + len(costs)
-            if self._maximum and total_cost >= self._maximum:
+            # Over budget: wait, unless the window is empty (a value whose
+            # cost alone reaches the maximum then goes out on its own).
+            if self._maximum and total_cost >= self._maximum and costs:
                 break
             args, cost = q.popleft()
             times.append(t)

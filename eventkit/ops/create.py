@@ -23,10 +23,17 @@ class Wait(Event):
             self._task = None
             self.set_done()
         else:
-            self._task = schedule_awaitable(future)
-            future.add_done_callback(self._on_task_done)
+            task = schedule_awaitable(future)
+            # Only a task started here is this event's to cancel; a future
+            # passed in belongs to the caller and is only watched.
+            self._task = task if task is not future else None
+            task.add_done_callback(self._on_task_done)
 
     def _on_task_done(self, task):
+        self._task = None
+        if task.cancelled():
+            self.set_done()
+            return
         try:
             result = task.result()
         except Exception as error:
@@ -34,7 +41,6 @@ class Wait(Event):
             self.error_event.emit(self, error)
 
         self.emit(result)
-        self._task = None
         self.set_done()
 
     def __del__(self):
@@ -48,6 +54,9 @@ class Aiterate(Event):
         Event.__init__(self, ait.__qualname__)
 
         self._task = schedule_awaitable(self._looper(ait))
+        # A task cancelled before its first step never runs the looper's
+        # ``finally``; this ends the event in that case too.
+        self._task.add_done_callback(self._on_task_done)
 
     async def _looper(self, ait):
         try:
@@ -55,7 +64,12 @@ class Aiterate(Event):
                 self.emit(args)
         except Exception as error:
             self.error_event.emit(self, error)
+        finally:
+            # Also when cancelled, so whatever follows this source ends.
+            self._task = None
+            self.set_done()
 
+    def _on_task_done(self, _task):
         self._task = None
         self.set_done()
 

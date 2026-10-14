@@ -23,10 +23,12 @@ class Skip(Op):
         self._n = 0
 
     def on_source(self, *args):
-        self._n += 1
-        if self._n == self._count:
-            self._source -= self.on_source
-            self._source += self.emit
+        # Stays subscribed through ``on_source`` (held strongly by the
+        # source); re-subscribing ``emit`` would hold it only weakly.
+        if self._n < self._count:
+            self._n += 1
+        else:
+            self.emit(*args)
 
 
 class Take(Op):
