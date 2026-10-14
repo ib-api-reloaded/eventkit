@@ -29,7 +29,7 @@ numpy = ["numpy (>=2.4.4,<3.0.0)"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.15.9,<0.16.0",
+    "ruff>=0.17.0,<0.18.0",
     "pre-commit>=3.5.0,<4.0.0",
     "pytest>=8.4.1,<9.0.0",
     "pytest-xdist>=3.6.1,<4.0.0",
@@ -54,7 +54,7 @@ packages = [{ include = "eventkit" }]
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-ruff = "^0.15.9"
+ruff = "^0.17.0"
 pre-commit = "^3.5.0"
 pytest = "^8.4.1"
 pytest-xdist = "^3.6.1"
@@ -80,21 +80,32 @@ build-backend = "poetry.core.masonry.api"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
-ignore = [
-    "D100",
-    "D101",
-    "D102",
-    "D105",
-    "D107",
-    "D200",
-    "D205",
-    "D400",
-    "D401",
-    "D402",
-    "E402",
-    "F401",
+# Listed explicitly so a ruff upgrade never changes what is checked.
+select = [
+  # pycodestyle errors and pyflakes (ruff's long-standing defaults)
+  "E4",
+  "E7",
+  "E9",
+  "F",
+  # convert legacy python syntax to modern syntax
+  "UP",
+  # isort imports
+  "I",
+  # simplifications
+  "SIM",
+  # pathlib over os.path / open()
+  "PTH",
+  # modern idioms (refurb)
+  "FURB",
+  # specific ignore / type-ignore codes
+  "PGH",
 ]
+ignore = [
+  "E402", # event.py imports the operators at the bottom (circular import)
+  "SIM102", # collapsible-if: nested ifs often read clearer
+  "SIM110", # reimplemented-builtin: explicit loops often read clearer
+]
+
 [tool.pytest.ini_options]
 log_cli = true
 asyncio_default_test_loop_scope = "session"

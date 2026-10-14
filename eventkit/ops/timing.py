@@ -225,9 +225,7 @@ class Throttle(Op):
             if not self._is_throttling:
                 self.status_event.emit(True)
             if self._handle is None:
-                self._handle = loop.call_at(
-                    times[0] + self._interval, self._on_retry
-                )
+                self._handle = loop.call_at(times[0] + self._interval, self._on_retry)
         elif self._is_throttling:
             self.status_event.emit(False)
         self._is_throttling = bool(q)

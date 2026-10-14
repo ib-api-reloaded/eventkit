@@ -4,7 +4,6 @@ from collections import namedtuple
 
 import numpy as np
 
-import eventkit as ev
 from eventkit import Event
 from eventkit.util import get_event_loop
 

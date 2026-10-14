@@ -30,19 +30,19 @@ class Array(Op):
             self._q.popleft()
         self.emit(np.asarray(self._q))
 
-    def min(self) -> "ArrayMin":  # type: ignore
+    def min(self) -> "ArrayMin":  # type: ignore[override]
         """
         Minimum value.
         """
         return ArrayMin(self)
 
-    def max(self) -> "ArrayMax":  # type: ignore
+    def max(self) -> "ArrayMax":  # type: ignore[override]
         """
         Maximum value.
         """
         return ArrayMax(self)
 
-    def sum(self) -> "ArraySum":  # type: ignore
+    def sum(self) -> "ArraySum":  # type: ignore[override]
         """
         Summation.
         """
@@ -54,25 +54,25 @@ class Array(Op):
         """
         return ArrayProd(self)
 
-    def mean(self) -> "ArrayMean":  # type: ignore
+    def mean(self) -> "ArrayMean":  # type: ignore[override]
         """
         Mean value.
         """
         return ArrayMean(self)
 
-    def std(self) -> "ArrayStd":  # type: ignore
+    def std(self) -> "ArrayStd":  # type: ignore[override]
         """
         Sample standard deviation.
         """
         return ArrayStd(self)
 
-    def any(self) -> "ArrayAny":  # type: ignore
+    def any(self) -> "ArrayAny":  # type: ignore[override]
         """
         Test if any array value is true.
         """
         return ArrayAny(self)
 
-    def all(self) -> "ArrayAll":  # type: ignore
+    def all(self) -> "ArrayAll":  # type: ignore[override]
         """
         Test if all array values are true.
         """

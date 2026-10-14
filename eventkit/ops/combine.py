@@ -1,6 +1,5 @@
 import functools
 from collections import defaultdict, deque
-from typing import Deque, Optional
 
 from ..event import Event
 from ..util import NO_VALUE

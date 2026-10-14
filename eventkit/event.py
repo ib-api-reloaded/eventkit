@@ -11,9 +11,6 @@ from dataclasses import dataclass, field
 from typing import Any as AnyType
 from typing import (
     Final,
-    List,
-    Tuple,
-    Union,
 )
 
 from .util import NO_VALUE, _NoValue, get_event_loop, schedule_awaitable
@@ -85,10 +82,7 @@ class Slots:
             func = slot.func
 
             try:
-                if ref:
-                    obj = ref()
-                else:
-                    obj = slot.obj
+                obj = ref() if ref else slot.obj
 
                 result = None
                 if obj is None:
@@ -1457,14 +1451,6 @@ from .ops.aggregate import (
 from .ops.aggregate import List as ListOp
 from .ops.array import (
     Array,
-    ArrayAll,
-    ArrayAny,
-    ArrayMax,
-    ArrayMean,
-    ArrayMin,
-    ArrayProd,
-    ArrayStd,
-    ArraySum,
 )
 from .ops.combine import (
     AddableJoinOp,

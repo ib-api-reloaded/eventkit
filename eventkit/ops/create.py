@@ -2,7 +2,7 @@ import asyncio
 import itertools
 
 from ..event import Event
-from ..util import NO_VALUE, get_event_loop, schedule_awaitable, timerange
+from ..util import NO_VALUE, schedule_awaitable, timerange
 from .op import Op
 
 
