@@ -1,21 +1,24 @@
-import time
 import unittest
 
 from eventkit import Event
+
+from .virtual_clock import VirtualClockTestCase
 
 array1 = list(range(10))
 array2 = list(range(100, 110))
 array3 = list(range(200, 210))
 
 
-class TimingTest(unittest.TestCase):
+class TimingTest(VirtualClockTestCase, unittest.TestCase):
     def test_delay(self):
         delay = 0.01
         src = Event.sequence(array1, interval=0.01)
-        e1 = src.timestamp().pluck(0)
-        e2 = src.delay(delay).timestamp().pluck(0)
-        r = e1.zip(e2).map(lambda a, b: b - a).mean().run()
-        self.assertLess(abs(r[-1]), delay + 0.002)
+        e1 = src.map(lambda _: self.loop.time())
+        e2 = src.delay(delay).map(lambda _: self.loop.time())
+        lags = e1.zip(e2).map(lambda a, b: b - a).run()
+        self.assertEqual(len(lags), len(array1))
+        for lag in lags:
+            self.assertAlmostEqual(lag, delay, places=9)
 
     def test_sample(self):
         timer = Event.timer(0.021, 4)
@@ -51,10 +54,10 @@ class TimingTest(unittest.TestCase):
         self.assertEqual(event.run(), [100] * 10)
 
     def test_throttle(self):
-        t0 = time.time()
+        t0 = self.loop.time()
         a = list(range(500))
         event = Event.sequence(a).throttle(1000, 0.1, cost_func=lambda i: 10)
         result = event.run()
         self.assertEqual(result, a)
-        dt = time.time() - t0
+        dt = self.loop.time() - t0
         self.assertLess(abs(dt - 0.5), 0.05)

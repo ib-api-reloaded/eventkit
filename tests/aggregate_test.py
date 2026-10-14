@@ -2,10 +2,12 @@ import unittest
 
 from eventkit import Event
 
+from .virtual_clock import VirtualClockTestCase
+
 array = list(range(10))
 
 
-class AggregateTest(unittest.TestCase):
+class AggregateTest(VirtualClockTestCase, unittest.TestCase):
     def test_min(self):
         event = Event.sequence(array).min()
         self.assertEqual(event.run(), [0] * 10)

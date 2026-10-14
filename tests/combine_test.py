@@ -2,12 +2,14 @@ import unittest
 
 from eventkit import Event
 
+from .virtual_clock import VirtualClockTestCase
+
 array1 = list(range(10))
 array2 = list(range(100, 110))
 array3 = list(range(200, 210))
 
 
-class CombineTest(unittest.TestCase):
+class CombineTest(VirtualClockTestCase, unittest.TestCase):
     def test_merge(self):
         e1 = Event.sequence(array1, interval=0.01)
         e2 = Event.sequence(array2, interval=0.01).delay(0.001)
