@@ -417,13 +417,9 @@ class Event:
                 "asyncio event loop. Use 'await event.list()' instead."
             )
 
-        collector = self.list()
-        # Tasks this event's own pipeline started (sources, async maps);
-        # collected now, while every upstream link is still connected.
-        owned = _pipeline_tasks(collector)
-
-        # Subscribe before the loop runs: a source can finish on its very
-        # first step (an empty sequence), before any coroutine awaits it.
+        # Subscribe to the collector before attaching it, and before the
+        # loop runs: an event that has already ended makes it emit at once,
+        # and a source can end on its very first step (an empty sequence).
         result = loop.create_future()
 
         def on_values(values):
@@ -434,7 +430,12 @@ class Event:
             if not result.done():
                 result.set_exception(error)
 
+        collector = ListOp()
         collector.connect(on_values, on_error, keep_ref=True)
+        collector.set_source(self)
+        # Tasks this event's own pipeline started (sources, async maps);
+        # collected now, while every upstream link is still connected.
+        owned = _pipeline_tasks(collector)
 
         async def _run_and_clean():
             try:

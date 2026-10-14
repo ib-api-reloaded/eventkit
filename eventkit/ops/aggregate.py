@@ -103,7 +103,7 @@ class Ema(Op):
 
     def __init__(self, n=None, weight=None, source=None):
         Op.__init__(self, source)
-        self._f1 = weight or 2.0 / (n + 1)
+        self._f1 = weight if weight is not None else 2.0 / (n + 1)
         self._f2 = 1 - self._f1
         self._prev = NO_VALUE
 
@@ -139,8 +139,10 @@ class List(Op):
     _values: list[AnyType]
 
     def __init__(self, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._values = []
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         self._values.append(args[0] if len(args) == 1 else args or NO_VALUE)

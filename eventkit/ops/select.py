@@ -97,19 +97,31 @@ class TakeUntil(Op):
     _notifier: Event | None
 
     def __init__(self, notifier, source=None):
-        Op.__init__(self, source)
-        self._notifier = notifier
-        notifier.connect(self._on_notifier, self.on_source_error, self.on_source_done)
+        Op.__init__(self)
+        self._notifier = None
+        # A notifier that has ended without emitting never stops the source.
+        if not notifier.done():
+            self._notifier = notifier
+            notifier.connect(
+                self._on_notifier, self.on_source_error, self._release_notifier
+            )
+        if source is not None:
+            self.set_source(source)
 
     def _on_notifier(self, *args):
         self.on_source_done(self._source)
 
+    def _release_notifier(self, *args):
+        notifier = self._notifier
+        if notifier is not None:
+            notifier.disconnect(
+                self._on_notifier, self.on_source_error, self._release_notifier
+            )
+            self._notifier = None
+
     def on_source_done(self, source):
         Op.on_source_done(self, self._source)
-        self._notifier.disconnect(
-            self._on_notifier, self.on_source_error, self.on_source_done
-        )
-        self._notifier = None
+        self._release_notifier()
 
 
 @event_class
@@ -148,8 +160,10 @@ class Last(Op):
     _last: Any
 
     def __init__(self, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._last = NO_VALUE
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         self._last = args

@@ -18,15 +18,14 @@ def _cancel_unless_loop_closed(task) -> None:
 class Wait(Event):
     def __init__(self, future, name="wait"):
         Event.__init__(self, name)
-        if future.done():
-            self._task = None
-            self.set_done()
-        else:
-            task = schedule_awaitable(future)
-            # Only a task started here is this event's to cancel; a future
-            # passed in belongs to the caller and is only watched.
-            self._task = task if task is not future else None
-            task.add_done_callback(self._on_task_done)
+        # Any awaitable (future, task, coroutine). A future that is already
+        # done still emits its result: its done callback runs on the next
+        # loop iteration, once listeners are connected.
+        task = schedule_awaitable(future)
+        # Only a task started here is this event's to cancel; a future
+        # passed in belongs to the caller and is only watched.
+        self._task = task if task is not future else None
+        task.add_done_callback(self._on_task_done)
 
     def _on_task_done(self, task):
         self._task = None

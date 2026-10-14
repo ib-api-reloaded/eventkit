@@ -18,12 +18,14 @@ class Delay(Op):
     _handle: asyncio.TimerHandle | None
 
     def __init__(self, delay, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._delay = delay
         # (deadline, callback, args) in arrival order; deadlines never
         # decrease, so the head is always the next one due.
         self._pending = deque()
         self._handle = None  # the one timer, set for the head's deadline
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         self._schedule(self.emit, args)
@@ -73,14 +75,14 @@ class Timeout(Op):
     _last_time: float
 
     def __init__(self, timeout, source=None):
-        Op.__init__(self, source)
-        if source is not None and source.done():
-            return
+        Op.__init__(self)
         self._timeout = timeout
-        loop = get_event_loop()
-        self._last_time = loop.time()
+        self._last_time = get_event_loop().time()
         self._handle = None
-        self._schedule()
+        if source is None or not source.done():
+            self._schedule()
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         loop = get_event_loop()
@@ -88,8 +90,9 @@ class Timeout(Op):
         Op.on_source(self, *args)
 
     def on_source_done(self, source):
-        self._handle.cancel()
-        del self._handle
+        if self._handle is not None:
+            self._handle.cancel()
+            self._handle = None
         Op.on_source_done(self, source)
 
     def _schedule(self):
@@ -121,11 +124,13 @@ class Debounce(Op):
     _last_time: float
 
     def __init__(self, interval, on_first=False, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._interval = interval
         self._on_first = on_first
         self._last_time = -float("inf")
         self._handle = None
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         loop = get_event_loop()
@@ -168,7 +173,7 @@ class Throttle(Op):
     _handle: asyncio.TimerHandle | None
 
     def __init__(self, maximum, interval, cost_func=None, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self.status_event = Event("throttle_status")
         """
         Sub event that emits ``True`` when throttling starts and ``False``
@@ -182,6 +187,8 @@ class Throttle(Op):
         self._cost_q = deque()  # deque of costs of previous emits
         self._is_throttling = False
         self._handle = None  # the one pending retry, if any
+        if source is not None:
+            self.set_source(source)
 
     def set_limit(self, maximum, interval):
         """
@@ -263,9 +270,11 @@ class Sample(Op):
     _timer: Event | None
 
     def __init__(self, timer, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._timer = timer
         timer.connect(self._on_timer, self.on_source_error, self.on_source_done)
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         self._value = args
@@ -276,7 +285,7 @@ class Sample(Op):
 
     def on_source_done(self, source):
         Op.on_source_done(self, self._source)
-        self._timer.disconnect(
-            self._on_timer, self.on_source_error, self.on_source_done
-        )
-        self._timer = None
+        timer = self._timer
+        if timer is not None:
+            timer.disconnect(self._on_timer, self.on_source_error, self.on_source_done)
+            self._timer = None

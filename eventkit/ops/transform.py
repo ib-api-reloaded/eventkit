@@ -53,14 +53,14 @@ class Enumerate(Op):
         self._step = step
 
     def on_source(self, *args):
-        self.emit(self._i, args[0] if len(args) == 1 else args or NO_VALUE)
+        self.emit(self._i, *args)
         self._i += self._step
 
 
 @event_class
 class Timestamp(Op):
     def on_source(self, *args):
-        self.emit(time.time(), args[0] if len(args) == 1 else args or NO_VALUE)
+        self.emit(time.time(), *args)
 
 
 @event_class
@@ -169,9 +169,11 @@ class Chunk(Op):
     _list: list[Any]
 
     def __init__(self, size, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._size = size
         self._list = []
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         self._list.append(args[0] if len(args) == 1 else args or NO_VALUE)
@@ -193,11 +195,13 @@ class ChunkWith(Op):
     _emit_empty: bool
 
     def __init__(self, timer, emit_empty, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._timer = timer
         self._emit_empty = emit_empty
         self._list = []
         timer.connect(self._on_timer, self.on_source_error, self.on_source_done)
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         self._list.append(args[0] if len(args) == 1 else args or NO_VALUE)
@@ -231,16 +235,15 @@ class Map(Op):
     _tasks: deque[asyncio.Future[Any]]
 
     def __init__(self, func, timeout=0, ordered=True, task_limit=None, source=None):
-        Op.__init__(self, source)
-        if source is not None and source.done():
-            return
-
+        Op.__init__(self)
         self._func = func
         self._timeout = timeout
         self._ordered = ordered
         self._task_limit = task_limit
         self._coro_q = deque()
         self._tasks = deque()
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         obj = self._func(*args)
@@ -309,11 +312,15 @@ class Emap(Op):
     _joiner: Event | None
 
     def __init__(self, constr, joiner, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._constr = constr
         self._joiner = joiner
-        joiner.set_parent(source)
+        # Subscribe before linking the joiner to the source: with a source
+        # that has already ended, the joiner ends right away.
         joiner.connect(self.emit, self.error_event.emit, self._on_joiner_done)
+        joiner.set_parent(source)
+        if source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         obj = self._constr(*args)

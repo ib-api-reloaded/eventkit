@@ -14,6 +14,17 @@ class Op(Event):
 
     The default handlers will pass along source emits, errors and done events.
     This makes ``Op`` also suitable as an identity operator.
+
+    A source that has already ended is handled as if it ended right then
+    (``on_source_done``), so an operator ends the same way either way. An
+    operator whose ``on_source_done`` uses its own state therefore sets
+    that state up first and attaches to the source last::
+
+        def __init__(self, ..., source=None):
+            Op.__init__(self)
+            self._state = ...
+            if source is not None:
+                self.set_source(source)
     """
 
     def __init__(self, source: Event | None = None):
@@ -45,7 +56,7 @@ class Op(Event):
 
     def _connect_from(self, source: Event):
         if source.done():
-            self.set_done()
+            self.on_source_done(source)
         else:
             source.connect(
                 self.on_source, self.on_source_error, self.on_source_done, keep_ref=True
