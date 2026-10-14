@@ -6,8 +6,12 @@ jobs:
     uv:
         runs-on: ubuntu-latest
         strategy:
+            fail-fast: false
             matrix:
                 python-version: ["pypy3.11", "3.11", "3.12", "3.13", "3.14"]
+        env:
+            # Every `uv` command (and so every make target) uses this interpreter.
+            UV_PYTHON: ${{ matrix.python-version }}
 
         steps:
           - uses: actions/checkout@v6
@@ -15,21 +19,15 @@ jobs:
             uses: actions/setup-python@v6
             with:
                 python-version: ${{ matrix.python-version }}
-                cache: pip
+                allow-prereleases: true
           - name: Set up uv
             uses: astral-sh/setup-uv@v7
-          - name: Display Python version
-            run: python -c "import sys; print(sys.version)"
-          - name: Install dependencies
-            run: uv sync --extra numpy --group dev
-          - name: Ruff static code analysis
-            run: |
-                uv run ruff check eventkit/
-                uv run ruff format --check eventkit/
-          - name: MyPy static code analysis
+          - name: Ruff
+            run: make ruff
+          - name: MyPy
             if: startsWith(matrix.python-version, 'pypy') == false
-            run: uv run mypy .
-          - name: Test with pytest
-            run: uv run pytest -vs
+            run: make typecheck
+          - name: Tests
+            run: make test
           - name: Build a binary wheel and a source tarball
-            run: uv build
+            run: make build
