@@ -6,6 +6,14 @@ from ..util import NO_VALUE, schedule_awaitable, timerange
 from .op import Op
 
 
+def _cancel_unless_loop_closed(task) -> None:
+    """Cancel a still-running task from a finalizer. A task whose loop has
+    been closed is left alone: cancelling it would schedule on the closed
+    loop and raise, and a finalizer must not raise."""
+    if task is not None and not task.done() and not task.get_loop().is_closed():
+        task.cancel()
+
+
 class Wait(Event):
     __slots__ = ("_task",)
 
@@ -30,8 +38,7 @@ class Wait(Event):
         self.set_done()
 
     def __del__(self):
-        if self._task:
-            self._task.cancel()
+        _cancel_unless_loop_closed(self._task)
 
 
 class Aiterate(Event):
@@ -53,8 +60,7 @@ class Aiterate(Event):
         self.set_done()
 
     def __del__(self):
-        if self._task:
-            self._task.cancel()
+        _cancel_unless_loop_closed(self._task)
 
 
 class Sequence(Aiterate):

@@ -1,10 +1,12 @@
 import asyncio
+import gc
 import subprocess
 import sys
 import textwrap
 import threading
 import unittest
 import warnings
+from unittest.mock import patch
 
 from eventkit import Event
 from eventkit.util import get_event_loop
@@ -134,3 +136,18 @@ class EventRunScopeTest(VirtualClockTestCase, unittest.TestCase):
         self.assertEqual(result, [1, Event.NO_VALUE])
         self.assertTrue(source._task is None or source._task.done())
 
+
+class FinalizerTest(unittest.TestCase):
+    def test_source_collected_after_its_loop_closed_does_not_raise(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        source = Event.sequence([1, 2], interval=10.0)
+        loop.run_until_complete(asyncio.sleep(0))  # its task is now running
+        asyncio.set_event_loop(None)
+        loop.close()  # a short-lived loop closed with the source still pending
+
+        raised = []
+        with patch.object(sys, "unraisablehook", raised.append):
+            del source
+            gc.collect()
+        self.assertEqual(raised, [])

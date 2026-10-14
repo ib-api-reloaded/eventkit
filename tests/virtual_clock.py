@@ -72,6 +72,11 @@ class VirtualClockTestCase:
         asyncio.set_event_loop(self.loop)
 
     def tearDown(self):
+        # Stop whatever the test left running on its loop before closing it.
+        pending = [t for t in asyncio.all_tasks(self.loop) if not t.done()]
+        for task in pending:
+            task.cancel()
+        self.loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
         asyncio.set_event_loop(None)
         self.loop.close()
         super().tearDown()
