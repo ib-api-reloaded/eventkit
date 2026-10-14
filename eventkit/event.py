@@ -327,11 +327,9 @@ class Event:
 
         .. note::
 
-            When running inside a Jupyter notebook this will give an error
-            that the asyncio event loop is already running. This can be
-            remedied by applying
-            `nest_asyncio <https://github.com/erdewit/nest_asyncio>`_
-            or by using the top-level ``await`` statement of Jupyter::
+            ``run()`` raises ``RuntimeError`` when the thread's event loop
+            is already running, as it is inside a Jupyter notebook or any
+            coroutine. Await the event there instead::
 
                 await event.list()
         """

@@ -163,13 +163,13 @@ The complete `API documentation <https://eventkit.readthedocs.io/en/latest/api.h
 .. _Python: http://www.python.org
 .. _`Interactive Brokers Python API`: http://interactivebrokers.github.io
 
-.. |Build| image:: https://github.com/erdewit/eventkit/actions/workflows/test.yml/badge.svg?branch=master
+.. |Build| image:: https://github.com/ib-api-reloaded/eventkit/actions/workflows/build-n-test.yml/badge.svg
    :alt: Build
-   :target: https://github.com/erdewit/eventkit/actions
+   :target: https://github.com/ib-api-reloaded/eventkit/actions
 
-.. |PyPiVersion| image:: https://img.shields.io/pypi/v/eventkit.svg
+.. |PyPiVersion| image:: https://img.shields.io/pypi/v/aeventkit.svg
    :alt: PyPi
-   :target: https://pypi.python.org/pypi/eventkit
+   :target: https://pypi.org/project/aeventkit/
 
 
 .. |PyVersion| image:: https://img.shields.io/badge/python-3.6+-blue.svg
