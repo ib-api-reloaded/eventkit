@@ -1,11 +1,14 @@
 import asyncio
 import unittest
 from collections import namedtuple
-
-import numpy as np
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from eventkit import Event
+from eventkit.ops import transform
 from eventkit.util import get_event_loop
+
+from .virtual_clock import VirtualClockTestCase
 
 array = list(range(20))
 
@@ -37,13 +40,6 @@ class TransformTest(unittest.TestCase):
         s = "abcdefghij"
         event = Event.sequence(s).enumerate()
         self.assertEqual(event.run(), list(enumerate(s)))
-
-    def test_timestamp(self):
-        interval = 0.002
-        event = Event.sequence(array, interval=interval).timestamp()
-        times = event.pluck(0).run()
-        std = np.std(np.diff(times) - interval)
-        self.assertLess(std, interval)
 
     def test_partial(self):
         event = Event.sequence(array).partial(42)
@@ -185,3 +181,16 @@ class TransformTest(unittest.TestCase):
 
         # The event should now have emitted the future's result
         self.assertEqual(result, [42])
+
+
+class TimestampTest(VirtualClockTestCase, unittest.TestCase):
+    def test_timestamp_stamps_each_value_when_emitted(self):
+        """``timestamp()`` stamps with the wall clock; here that clock is
+        pointed at the virtual loop clock so the stamps are exact."""
+        interval = 0.002
+        wallClock = SimpleNamespace(time=lambda: 1_000_000.0 + self.loop.time())
+        with patch.object(transform, "time", wallClock):
+            stamped = Event.sequence(array, interval=interval).timestamp().run()
+        self.assertEqual([value for _, value in stamped], array)
+        for i, (stamp, _) in enumerate(stamped):
+            self.assertAlmostEqual(stamp, 1_000_000.0 + i * interval, places=9)
