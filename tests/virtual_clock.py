@@ -45,6 +45,10 @@ class VirtualClockLoop(asyncio.SelectorEventLoop):
     """Selector event loop whose ``time()`` only moves when the loop
     would otherwise wait."""
 
+    # BaseEventLoop's heap of pending timers (set in its __init__; not part
+    # of the typed asyncio API), read to land exactly on the next deadline.
+    _scheduled: list[asyncio.TimerHandle]
+
     def __init__(self):
         self._now = 0.0
         super().__init__(selector=_InstantSelector(self))
