@@ -2,11 +2,10 @@
 
 import asyncio
 import datetime as dt
-import threading
+import sys
+import warnings
 from collections.abc import AsyncIterator
 from typing import Final
-
-_thread_local = threading.local()
 
 
 class _NoValue:
@@ -22,20 +21,57 @@ class _NoValue:
 NO_VALUE: Final = _NoValue()
 
 
-def get_event_loop():
-    """Get the running event loop, or create/cache one for sync contexts."""
+if sys.version_info >= (3, 14):
+
+    def _thread_loop() -> asyncio.AbstractEventLoop | None:
+        """The loop set for this thread, or None (3.14+ never creates one)."""
+        try:
+            return asyncio.get_event_loop()
+        except RuntimeError:
+            return None
+
+else:
+
+    def _thread_loop() -> asyncio.AbstractEventLoop | None:
+        """The loop set for this thread, or None.
+
+        The policy API is the only public way to read it before 3.14 and
+        is not deprecated there. On 3.12 / 3.13 the main thread's first
+        call creates and sets a loop with a DeprecationWarning; the loop
+        is the one we would create anyway, so the warning is suppressed.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            try:
+                return asyncio.get_event_loop_policy().get_event_loop()
+            except RuntimeError:
+                return None
+
+
+def get_event_loop() -> asyncio.AbstractEventLoop:
+    """Return the event loop for the calling thread.
+
+    In order of preference:
+
+    1. the running loop;
+    2. the loop set for this thread (``asyncio.set_event_loop``), so an
+       application's own loop is always the one used;
+    3. otherwise a new loop, which is set for this thread so asyncio and
+       every caller of this function share it.
+
+    A closed loop is replaced the same way as a missing one. No
+    deprecated asyncio API is used and no DeprecationWarning is emitted
+    on any supported Python version.
+    """
     try:
         return asyncio.get_running_loop()
     except RuntimeError:
-        loop = getattr(_thread_local, "loop", None)
-        if loop is None or loop.is_closed():
-            loop = asyncio.new_event_loop()
-            _thread_local.loop = loop
-            # Keep the policy in sync so asyncio.gather() et al. work
-            # in sync contexts. set_event_loop is deprecated (removal
-            # targeted for 3.16) but still needed for interop.
-            asyncio.set_event_loop(loop)
-        return loop
+        pass
+    loop = _thread_loop()
+    if loop is None or loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
 
 
 def schedule_awaitable(awaitable):
