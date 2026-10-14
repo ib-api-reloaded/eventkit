@@ -307,6 +307,9 @@ class Emap(Op):
     def _on_joiner_done(self, joiner):
         joiner.disconnect(self.emit, self.error_event.emit, self._on_joiner_done)
         self._joiner = None
+        if self._source is not None:
+            self._disconnect_from(self._source)
+            self._source = None
         self.set_done()
 
 

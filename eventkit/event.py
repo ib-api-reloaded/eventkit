@@ -413,9 +413,23 @@ class Event:
         # collected now, while every upstream link is still connected.
         owned = _pipeline_tasks(collector)
 
+        # Subscribe before the loop runs: a source can finish on its very
+        # first step (an empty sequence), before any coroutine awaits it.
+        result = loop.create_future()
+
+        def on_values(values):
+            if not result.done():
+                result.set_result(values)
+
+        def on_error(_source, error):
+            if not result.done():
+                result.set_exception(error)
+
+        collector.connect(on_values, on_error, keep_ref=True)
+
         async def _run_and_clean():
             try:
-                return await collector
+                return await result
             finally:
                 # The pipeline may have ended before some of its sources
                 # did (e.g. ``timeout``): stop what is left of it, and

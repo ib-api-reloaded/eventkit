@@ -153,4 +153,5 @@ class Deque(Op):
         self._q.append(args[0] if len(args) == 1 else args or NO_VALUE)
         if self._count and len(self._q) > self._count:
             self._q.popleft()
-        self.emit(self._q)
+        # A copy: listeners keep what they were given, not a live view.
+        self.emit(deque(self._q))

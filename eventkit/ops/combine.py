@@ -116,14 +116,17 @@ class Switch(AddableJoinOp):
         if not cb:
             cb = functools.partial(self.on_source_s, source)
             self._source2cb[source] = cb
-            source.connect(cb, done=self.on_source_done)
+            source.connect(cb, self.on_source_error, self.on_source_done)
 
     def _remove_source(self, source):
         if source in self._sources:
-            self._sources.remove(source)
+            # Every entry: a source added more than once shares one callback.
+            while source in self._sources:
+                self._sources.remove(source)
             cb = self._source2cb.pop(source, None)
             if cb:
-                source -= cb
+                # All three: a dropped source must not end this event later.
+                source.disconnect(cb, self.on_source_error, self.on_source_done)
 
     def on_source_s(self, source, *args):
         if source is not self._active_source:
@@ -154,19 +157,19 @@ class Concat(AddableJoinOp):
         if not cb:
             cb = functools.partial(self._on_source_s, source)
             self._source2cb[source] = cb
-            source.connect(cb, done=self.on_source_done)
+            source.connect(cb, self.on_source_error, self.on_source_done)
 
     def _on_source_s(self, source, *args):
         while self._sources and self._sources[0] is not source:
             s = self._sources.popleft()
             cb = self._source2cb.pop(s, None)
             if cb:
-                s.disconnect(cb, done=self.on_source_done)
+                s.disconnect(cb, self.on_source_error, self.on_source_done)
         self.emit(*args)
 
     def on_source_done(self, source):
         cb = self._source2cb.pop(source)
-        source.disconnect(cb, done=self.on_source_done)
+        source.disconnect(cb, self.on_source_error, self.on_source_done)
         while source in self._sources:
             self._sources.remove(source)
         if not self._sources and self._parent is None:

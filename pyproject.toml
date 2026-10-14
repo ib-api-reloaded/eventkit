@@ -33,6 +33,7 @@ numpy = ["numpy>=2.4.4,<3.0.0"]
 # What the tests need, and nothing else: `make test` installs only this
 # group, so the tests also run where the lint tools have no wheels (PyPy).
 test = [
+    "hypothesis>=6.100,<7",
     "pytest>=8.4.1,<9.0.0",
     "pytest-asyncio>=1.0.0,<2.0.0",
     "pytest-timeout>=2.3.1,<3.0.0",

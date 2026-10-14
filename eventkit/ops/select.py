@@ -139,5 +139,6 @@ class Last(Op):
         self._last = args
 
     def on_source_done(self, source):
-        self.emit(*self._last)
+        if self._last is not NO_VALUE:  # an empty source has no last value
+            self.emit(*self._last)
         Op.on_source_done(self, source)
