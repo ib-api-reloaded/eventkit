@@ -132,7 +132,7 @@ class TransformTest(unittest.TestCase):
             "__                  K    L      M   N",
         ]
         event = Event.range(3).concatmap(lambda v: Event.marble(marbles[v]))
-        self.assertEqual(event.run(), ["A", "B", "1", "2", "3", "K", "L", "M", "N"])
+        self.assertEqual(event.run(), ["A", "B", "C", "D", "3", "4", "L", "M", "N"])
 
     def test_chainmap(self):
         marbles = [

@@ -1100,7 +1100,8 @@ class Event:
                 '_1   2  3    4',
                 '__K   L     M   N']
 
-            ev.Range(3).mergemap(lambda v: ev.Marble(marbles[v]))
+            ev.Range(3, interval=1).mergemap(
+                lambda v: ev.Marble(marbles[v], interval=1))
             ->
             ['A', '1', 'K', 'B', '2', 'L', '3', 'C', 'M', '4', 'D', 'N']
         """
@@ -1108,16 +1109,20 @@ class Event:
 
     def concatmap(self, constr) -> Concatmap:
         """
-        :meth:`emap` that uses :meth:`concat` to combine the nested events::
+        :meth:`emap` that uses :meth:`concat` to combine the nested events:
+        each nested event is followed until it ends, then the next one;
+        what a later one emits before its turn is dropped (``1``, ``2``
+        and ``K`` here)::
 
             marbles = [
                 'A    B    C    D',
                 '_       1    2    3    4',
                 '__                  K    L      M   N']
 
-            ev.Range(3).concatmap(lambda v: ev.Marble(marbles[v]))
+            ev.Range(3, interval=1).concatmap(
+                lambda v: ev.Marble(marbles[v], interval=1))
             ->
-            ['A', 'B', '1', '2', '3', 'K', 'L', 'M', 'N']
+            ['A', 'B', 'C', 'D', '3', '4', 'L', 'M', 'N']
         """
         return Concatmap(constr, self)
 
@@ -1130,7 +1135,8 @@ class Event:
                 '_       1    2    3    4',
                 '__                  K    L      M   N']
 
-            ev.Range(3).chainmap(lambda v: ev.Marble(marbles[v]))
+            ev.Range(3, interval=1).chainmap(
+                lambda v: ev.Marble(marbles[v], interval=1))
             ->
             ['A', 'B', 'C', 'D', '1', '2', '3', '4', 'K', 'L', 'M', 'N']
         """
@@ -1145,9 +1151,10 @@ class Event:
                 '_                 K    L      M   N',
                 '__      1    2      3    4'
             ]
-            ev.Range(3).switchmap(lambda v: Event.marble(marbles[v]))
+            ev.Range(3, interval=1).switchmap(
+                lambda v: ev.Marble(marbles[v], interval=1))
             ->
-            ['A', 'B', '1', '2', 'K', 'L', 'M', 'N'])
+            ['A', 'B', '1', '2', 'K', 'L', 'M', 'N']
         """
         return Switchmap(constr, self)
 

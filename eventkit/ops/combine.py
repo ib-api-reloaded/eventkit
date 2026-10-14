@@ -164,6 +164,11 @@ class Switch(AddableJoinOp):
 
 @event_class
 class Concat(AddableJoinOp):
+    """Follow the sources one at a time, in order: the first until it
+    ends, then the next. A later source's values are dropped while an
+    earlier one is still running (``chain`` queues them instead); a later
+    source that ends before its turn is skipped."""
+
     _source2cb: dict[Event, Callable[..., None]]
 
     def __init__(self, *sources):
@@ -173,29 +178,25 @@ class Concat(AddableJoinOp):
 
     def _add_source(self, source):
         if source in self._sources:
-            return
+            return  # already followed in its turn
         self._sources.append(source)
-        cb = self._source2cb.get(source)
-        if not cb:
-            cb = functools.partial(self._on_source_s, source)
-            self._source2cb[source] = cb
-            source.connect(cb, self.on_source_error, self.on_source_done)
+        cb = functools.partial(self._on_source_s, source)
+        self._source2cb[source] = cb
+        # Every source is watched from the start: its errors are passed on
+        # right away, and its end is noticed even before its turn.
+        source.connect(cb, self.on_source_error, self.on_source_done)
 
     def _on_source_s(self, source, *args):
-        while self._sources and self._sources[0] is not source:
-            s = self._sources.popleft()
-            cb = self._source2cb.pop(s, None)
-            if cb:
-                s.disconnect(cb, self.on_source_error, self.on_source_done)
-        self.emit(*args)
+        if self._sources[0] is source:
+            self.emit(*args)
 
     def on_source_done(self, source):
-        cb = self._source2cb.pop(source)
-        source.disconnect(cb, self.on_source_error, self.on_source_done)
+        cb = self._source2cb.pop(source, None)
+        if cb is not None:
+            source.disconnect(cb, self.on_source_error, self.on_source_done)
         while source in self._sources:
             self._sources.remove(source)
-        if not self._sources and self._parent is None:
-            self.set_done()
+        self._end_if_exhausted()
 
 
 @event_class

@@ -28,7 +28,9 @@ class CombineTest(VirtualClockTestCase, unittest.TestCase):
         e2 = Event.sequence(array2, interval=0.02).delay(0.07)
         event = e1.concat(e2)
         self.assertEqual(
-            event.run(), [0, 1, 2, 3, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109]
+            # e2 values before e1 ends (at 0.18 s) are dropped: 100-105.
+            event.run(),
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 106, 107, 108, 109],
         )
 
     def test_chain(self):

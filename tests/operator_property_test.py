@@ -207,34 +207,6 @@ class ConcatModel(MergeModel):
             self.out.append((v,))
 
 
-class ForwardConcatModel(MergeModel):
-    """The ``Event.concatmap`` docstring: a source that emits becomes the
-    current one, and every source before it is dropped for good (its
-    marble drops ``C`` and ``D`` once ``1`` arrives, and ``4`` once ``K``
-    arrives). Dropped sources are no longer followed."""
-
-    def __init__(self):
-        super().__init__()
-        self.remaining = []
-
-    def add(self):
-        self.remaining.append(self.n)
-        super().add()
-
-    def emit(self, i, v):
-        if i in self.remaining:
-            del self.remaining[: self.remaining.index(i)]
-            self.out.append((v,))
-
-    def end(self, i):
-        super().end(i)
-        if i in self.remaining:
-            self.remaining.remove(i)
-
-    def following(self):
-        return set(self.remaining)
-
-
 class SwitchModel(MergeModel):
     """The ``Event.switch`` docstring: follow one source and move to
     another as soon as that one emits; the source switched away from is
@@ -297,10 +269,6 @@ def test_chain_emits_each_source_whole_in_order(case):
     assert play(joined("chain"), script, n) == expected(ChainModel(), script, n)
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="concat drops the running source when a later one emits (a switch)",
-)
 @given(join_scripts())
 def test_concat_follows_each_source_until_it_ends(case):
     n, script = case
@@ -457,9 +425,9 @@ def test_chainmap_emits_each_nested_event_whole_in_order(script):
 
 
 @given(emap_scripts())
-def test_concatmap_moves_forward_to_whichever_nested_event_emits(script):
+def test_concatmap_follows_each_nested_event_until_it_ends(script):
     got = play(lambda outer, constr: outer.concatmap(constr), script)
-    assert got == expected(ForwardConcatModel(), script)
+    assert got == expected(ConcatModel(), script)
 
 
 @given(emap_scripts())

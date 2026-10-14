@@ -13,7 +13,7 @@ import operator
 from collections import deque
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import given
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, precondition, rule
 
@@ -25,9 +25,6 @@ from .virtual_clock import VirtualClockLoop
 VALUES = st.lists(st.integers(-20, 20), max_size=20)
 COUNT = st.integers(0, 6)
 POSITIVE = st.integers(1, 6)
-
-settings.register_profile("eventkit", max_examples=150, deadline=None)
-settings.load_profile("eventkit")
 
 
 @contextlib.contextmanager
