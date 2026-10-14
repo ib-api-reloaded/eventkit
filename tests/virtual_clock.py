@@ -53,7 +53,13 @@ class VirtualClockLoop(asyncio.SelectorEventLoop):
         return self._now
 
     def advance(self, seconds: float) -> None:
-        self._now += seconds
+        # Land exactly on the next timer's deadline: `now + seconds` can
+        # round to just short of it, and the loop would then wait a
+        # vanishing amount that rounding swallows, so time never moves.
+        target = self._now + seconds
+        if self._scheduled:
+            target = max(target, self._scheduled[0].when())
+        self._now = target
 
 
 class VirtualClockTestCase:
