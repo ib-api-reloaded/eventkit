@@ -143,6 +143,7 @@ class Throttle(Op):
         "_time_q",
         "_cost_q",
         "_is_throttling",
+        "_handle",
     )
 
     def __init__(self, maximum, interval, cost_func=None, source=None):
@@ -159,6 +160,7 @@ class Throttle(Op):
         self._time_q = deque()  # deque of previous emit times
         self._cost_q = deque()  # deque of costs of previous emits
         self._is_throttling = False
+        self._handle = None  # the one pending retry, if any
 
     def set_limit(self, maximum, interval):
         """
@@ -181,15 +183,24 @@ class Throttle(Op):
             self.set_done()
             self.status_event.set_done()
 
-    def _try_emit(self):
+    def _on_retry(self):
+        # The window has moved on by at least this timer's deadline, even
+        # if asyncio runs the timer up to one clock tick before it.
+        deadline = self._handle.when()
+        self._handle = None
+        self._try_emit(deadline)
+
+    def _try_emit(self, not_before=None):
         loop = get_event_loop()
         t = loop.time()
+        if not_before is not None and not_before > t:
+            t = not_before
         q = self._q
         times = self._time_q
         costs = self._cost_q
 
         # forget old emit times
-        while times and t - times[0] > self._interval:
+        while times and times[0] + self._interval <= t:
             times.popleft()
             costs.popleft()
 
@@ -213,7 +224,10 @@ class Throttle(Op):
         if q:
             if not self._is_throttling:
                 self.status_event.emit(True)
-            loop.call_at(times[0] + self._interval, self._try_emit)
+            if self._handle is None:
+                self._handle = loop.call_at(
+                    times[0] + self._interval, self._on_retry
+                )
         elif self._is_throttling:
             self.status_event.emit(False)
         self._is_throttling = bool(q)

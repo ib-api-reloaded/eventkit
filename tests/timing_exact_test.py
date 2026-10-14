@@ -39,3 +39,21 @@ class TimeoutTest(VirtualClockTestCase, unittest.TestCase):
         self.assertEqual(event.run(), [1, Event.NO_VALUE])
         self.assertEqual(self.loop.time(), 0.01)
 
+
+class ThrottleTest(VirtualClockTestCase, unittest.TestCase):
+    def test_releases_each_window_on_time(self):
+        values = list(range(500))
+        event = Event.sequence(values).throttle(1000, 0.1, cost_func=lambda i: 10)
+        # 99 values of cost 10 fit under the 1000 limit per 0.1 s window.
+        self.assertEqual(event.run(), values)
+        self.assertAlmostEqual(self.loop.time(), 0.5, places=9)
+
+    def test_one_retry_timer_while_throttling(self):
+        source = Event()
+        throttled = source.throttle(10, 1.0)
+        for i in range(100):
+            source.emit(i)
+        timers = [
+            h for h in self.loop._scheduled if h._callback == throttled._on_retry
+        ]
+        self.assertEqual(len(timers), 1)
