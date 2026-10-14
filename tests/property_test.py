@@ -376,8 +376,10 @@ def _listener(index, calls):
 
 
 class ListenerMachine(RuleBasedStateMachine):
-    """connect / disconnect / emit in any order: every emit reaches each
-    connection exactly once, in connection order."""
+    """connect / disconnect / disconnect_all / += / -= / clear / emit in
+    any order: every emit reaches each connection exactly once, in
+    connection order; disconnect undoes one connect, disconnect_all
+    every one."""
 
     def __init__(self):
         super().__init__()
@@ -391,10 +393,24 @@ class ListenerMachine(RuleBasedStateMachine):
         self.event.connect(self.listeners[index])
         self.connected.append(index)
 
+    @rule(index=st.integers(0, 3), operator=st.booleans())
+    def disconnect(self, index, operator):
+        if operator:
+            self.event -= self.listeners[index]
+        else:
+            self.event.disconnect(self.listeners[index])
+        if index in self.connected:
+            self.connected.remove(index)  # the earliest connection
+
     @rule(index=st.integers(0, 3))
-    def disconnect(self, index):
-        self.event.disconnect(self.listeners[index])
+    def disconnect_all(self, index):
+        self.event.disconnect_all(self.listeners[index])
         self.connected = [i for i in self.connected if i != index]
+
+    @rule(index=st.integers(0, 3))
+    def connect_with_operator(self, index):
+        self.event += self.listeners[index]
+        self.connected.append(index)
 
     @rule(value=st.integers())
     def emit(self, value):
@@ -488,16 +504,18 @@ def test_timeout_passes_values_until_a_gap_exceeds_it(arrivals, timeout):
     assert out == expected
 
 
-@given(ARRIVALS, st.integers(1, 5), HALF)
+@given(ARRIVALS, st.integers(1, 5), HALF, st.booleans())
 def test_throttle_delivers_everything_in_order_within_the_limit(
-    arrivals, maximum, interval
+    arrivals, maximum, interval, inclusive
 ):
     times, values = timeline(arrivals)
     out = stamped(
-        lambda: Event.sequence(values, times=times).throttle(maximum, interval)
+        lambda: Event.sequence(values, times=times).throttle(
+            maximum, interval, inclusive=inclusive
+        )
     )
     assert [v for _, v in out] == values
-    allowed = max(1, maximum - 1)  # "remain under the maximum"
+    allowed = maximum if inclusive else max(1, maximum - 1)
     emitted = [t for t, _ in out]
     for i, t in enumerate(emitted):
         in_window = [u for u in emitted[: i + 1] if u > t - interval]
@@ -544,3 +562,27 @@ def test_ziplatest_keeps_positions_when_a_source_has_ended(values):
         for v in values:
             live.emit(v)
         assert out == [("final", v) for v in values]
+
+
+@given(st.integers(1, 30), st.integers(1, 8), st.booleans())
+def test_throttle_burst_fills_exactly_the_allowed_number_per_interval(
+    count, maximum, inclusive
+):
+    allowed = maximum if inclusive else max(1, maximum - 1)
+    out = stamped(
+        lambda: Event.sequence(range(count)).throttle(maximum, 1.5, inclusive=inclusive)
+    )
+    assert [v for _, v in out] == list(range(count))
+    # A burst goes out in groups of exactly `allowed`, one interval apart.
+    groups = [[v for t, v in out if t == when] for when in sorted({t for t, _ in out})]
+    assert all(len(group) == allowed for group in groups[:-1])
+    assert 0 < len(groups[-1]) <= allowed
+
+
+def test_throttle_set_limit_keeps_or_changes_inclusive():
+    op = Event("e").throttle(10, 1)
+    assert op._inclusive is False
+    op.set_limit(5, 2)
+    assert op._inclusive is False
+    op.set_limit(5, 2, inclusive=True)
+    assert (op._maximum, op._interval, op._inclusive) == (5, 2, True)

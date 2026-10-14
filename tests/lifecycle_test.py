@@ -9,6 +9,7 @@ import warnings
 
 from eventkit import Event, util
 from eventkit.ops.timing import Timeout
+from eventkit.ops.transform import Map
 from eventkit.util import get_event_loop
 
 from .virtual_clock import VirtualClockTestCase
@@ -172,3 +173,37 @@ class MainThreadLoopTest(unittest.TestCase):
             util._main_thread.loop = saved
         [error] = errors
         self.assertIn("main thread has no event loop", str(error))
+
+
+class DisconnectTest(unittest.TestCase):
+    def test_disconnect_undoes_one_connect(self):
+        event, seen = Event("e"), []
+        event.connect(seen.append)
+        event.connect(seen.append)
+        event.disconnect(seen.append)
+        event.emit(1)
+        self.assertEqual(seen, [1])
+        event.disconnect(seen.append)
+        event.disconnect(seen.append)  # not connected: nothing to do
+        event.emit(2)
+        self.assertEqual(seen, [1])
+
+    def test_disconnect_all_removes_every_connection_and_callbacks(self):
+        event, seen, done = Event("e"), [], []
+        for _ in range(3):
+            event.connect(seen.append, done=done.append)
+        event.disconnect_all(seen.append, done=done.append)
+        event.emit(1)
+        event.set_done()
+        self.assertEqual((seen, done), ([], []))
+
+    def test_disconnect_detaches_an_operator_connected_with_connect(self):
+        source, mapped = Event("source"), Map(abs)  # an operator without source
+        seen = []
+        mapped.connect(seen.append)
+        source.connect(mapped)
+        source.emit(-1)
+        source.disconnect(mapped)
+        source.emit(-2)
+        self.assertEqual(seen, [1])
+        self.assertIsNone(mapped._source)

@@ -94,17 +94,23 @@ class Slots:
     def add(self, obj, weakref, func) -> None:
         self.slots.append(Slot(obj, weakref, func))
 
-    def remove(self, obj, func):
-        """Remove a specific obj/func combination from the slots collection."""
-        self.slots = list(
-            itertools.filterfalse(
-                lambda x: (
-                    (x.obj is obj or x.weakref and x.weakref() is obj)
-                    and x.func is func
-                ),
-                self.slots,
+    def remove(self, obj, func, *, every: bool = False):
+        """Remove the earliest slot of this obj/func combination, or with
+        ``every`` all of them. Removing one that is not there does nothing."""
+
+        def matches(x):
+            return (x.obj is obj or x.weakref and x.weakref() is obj) and (
+                x.func is func
             )
-        )
+
+        if every:
+            self.slots = list(itertools.filterfalse(matches, self.slots))
+            return
+        for i, slot in enumerate(self.slots):
+            if matches(slot):
+                # A new list: an emit in progress iterates over a copy.
+                self.slots = self.slots[:i] + self.slots[i + 1 :]
+                return
 
     def remove_obj(self, obj):
         self.slots = list(
@@ -325,25 +331,52 @@ class Event:
 
     def disconnect(self, listener, error=None, done=None):
         """
-        Disconnect a listener from this event.
+        Undo one :meth:`connect`: remove one connection of the listener
+        (and of the given error and done callbacks). A listener connected
+        twice stays connected once. Disconnecting a listener that is not
+        connected does nothing. An operator connected with ``connect(op)``
+        is detached from this event.
 
         The ``-=`` operator can be used as a synonym for this method.
+        :meth:`disconnect_all` removes every connection of a listener,
+        :meth:`disconnect_obj` everything connected on an object, and
+        :meth:`clear` all listeners.
 
         Args:
-            listener: The callback to disconnect. The callback is removed at
-                most once. It is valid if the callback is already
-                not connected.
+            listener: The callback to disconnect.
             error: The error callback to disconnect.
             done: The done callback to disconnect.
         """
+        return self._disconnect(listener, error, done, every=False)
+
+    def disconnect_all(self, listener, error=None, done=None):
+        """
+        Remove every connection of the listener (and of the given error
+        and done callbacks), however many times it was connected.
+
+        Args:
+            listener: The callback to disconnect.
+            error: The error callback to disconnect.
+            done: The done callback to disconnect.
+        """
+        return self._disconnect(listener, error, done, every=True)
+
+    def _disconnect(self, listener, error, done, *, every: bool):
+        if isinstance(listener, Op):
+            # the inverse of connect(op): detach the operator from this event
+            if listener._source is self:
+                listener._disconnect_from(self)
+                listener._source = None
+            return self
+
         obj, func = self._split(listener)
-        self._slots.remove(obj, func)
+        self._slots.remove(obj, func, every=every)
 
         if self.done_event and done is not None:
-            self.done_event.disconnect(done)
+            self.done_event._disconnect(done, None, None, every=every)
 
         if self.error_event and error is not None:
-            self.error_event.disconnect(error)
+            self.error_event._disconnect(error, None, None, every=every)
 
         return self
 
@@ -523,12 +556,17 @@ class Event:
             return (c.__self__, c.__func__)
 
         if isinstance(c, types.BuiltinMethodType):
-            if type(c.__self__) is type:
-                # built-in method
-                return (c.__self__, c)
-            else:
-                # built-in function
-                return (None, c)
+            owner = c.__self__
+            if owner is not None and not isinstance(owner, types.ModuleType):
+                # A built-in method bound to an object, e.g. ``a_list.append``:
+                # each access makes a new bound method, so split it into the
+                # object and the class's method descriptor, which has a
+                # stable identity (needed to disconnect it again).
+                descriptor = getattr(type(owner), c.__name__, None)
+                if isinstance(descriptor, types.MethodDescriptorType):
+                    return (owner, descriptor)
+            # a built-in function such as print
+            return (None, c)
 
         if hasattr(c, "__call__"):
             return (c, None)
@@ -1449,7 +1487,9 @@ class Event:
         """
         return Timeout(timeout, self)
 
-    def throttle(self, maximum, interval, cost_func=None) -> Throttle:
+    def throttle(
+        self, maximum, interval, cost_func=None, *, inclusive: bool = False
+    ) -> Throttle:
         """
         Limit number of emits per time without dropping values.
         Values that come in too fast are queued and re-emitted as soon
@@ -1463,14 +1503,18 @@ class Event:
         Args:
             maximum: Maximum payload per interval.
             interval: Time interval (in seconds).
-            cost_func: The sum of ``cost_func(value)`` for every
-                source value inside the ``interval`` that is to remain
-                under the ``maximum`` (a value whose cost alone reaches the
-                maximum is emitted on its own, once the interval holds no
-                other emits). The default is to count every
-                source value as 1.
+            cost_func: The cost of a value; the sum of the costs of the
+                values emitted inside any ``interval`` is limited by
+                ``maximum``. The default is to count every value as 1.
+            inclusive: ``False`` (the default) keeps that sum below the
+                ``maximum``, so ``throttle(10, 1)`` emits at most 9 values
+                per second; ``True`` lets it reach the ``maximum``, so
+                ``throttle(10, 1, inclusive=True)`` emits up to 10.
+
+        Either way, a value whose cost alone exceeds the limit is emitted on
+        its own, once the interval holds no other emits.
         """
-        return Throttle(maximum, interval, cost_func, self)
+        return Throttle(maximum, interval, cost_func, self, inclusive=inclusive)
 
     def debounce(self, delay, on_first: bool = False) -> Debounce:
         """

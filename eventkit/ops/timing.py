@@ -164,6 +164,7 @@ class Debounce(Op):
 class Throttle(Op):
     status_event: Event
     _maximum: float
+    _inclusive: bool  # the total may reach the maximum (else stays below it)
     _interval: float
     _cost_func: Callable[..., float] | None
     _q: deque[tuple[tuple[Any, ...], float | None]]
@@ -172,7 +173,9 @@ class Throttle(Op):
     _is_throttling: bool
     _handle: asyncio.TimerHandle | None
 
-    def __init__(self, maximum, interval, cost_func=None, source=None):
+    def __init__(
+        self, maximum, interval, cost_func=None, source=None, *, inclusive=False
+    ):
         Op.__init__(self)
         self.status_event = Event("throttle_status")
         """
@@ -180,6 +183,7 @@ class Throttle(Op):
         when throttling ends.
         """
         self._maximum = maximum
+        self._inclusive = inclusive
         self._interval = interval
         self._cost_func = cost_func
         self._q = deque()  # deque of (args, cost) tuples
@@ -190,12 +194,15 @@ class Throttle(Op):
         if source is not None:
             self.set_source(source)
 
-    def set_limit(self, maximum, interval):
+    def set_limit(self, maximum, interval, *, inclusive=None):
         """
-        Dynamically update the ``maximum`` per ``interval`` limit.
+        Dynamically update the ``maximum`` per ``interval`` limit, and
+        optionally whether it is ``inclusive`` (unchanged when omitted).
         """
         self._maximum = maximum
         self._interval = interval
+        if inclusive is not None:
+            self._inclusive = inclusive
 
     def on_source(self, *args):
         cost = self._cost_func
@@ -243,7 +250,12 @@ class Throttle(Op):
                 total_cost = 1 + len(costs)
             # Over budget: wait, unless the window is empty (a value whose
             # cost alone reaches the maximum then goes out on its own).
-            if self._maximum and total_cost >= self._maximum and costs:
+            over = (
+                total_cost > self._maximum
+                if self._inclusive
+                else total_cost >= self._maximum
+            )
+            if self._maximum and over and costs:
                 break
             args, cost = q.popleft()
             times.append(t)
