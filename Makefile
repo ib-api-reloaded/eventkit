@@ -39,7 +39,7 @@ typecheck:
 lint: ruff typecheck
 
 test:
-	uv run --all-extras $(PYTEST)
+	uv run --all-extras --no-dev --group test $(PYTEST)
 
 test-matrix:
 	$(RELEASEKIT) matrix $(foreach v,$(PYTHONS),--python=$(v))

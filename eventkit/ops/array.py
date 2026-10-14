@@ -18,7 +18,7 @@ class Array(Op):
         if np is None:
             raise ImportError(
                 "numpy is required for Array operators. "
-                "Install it with: pip install numpy"
+                "Install it with: pip install aeventkit[numpy]"
             )
         Op.__init__(self, source)
         self._count = count
