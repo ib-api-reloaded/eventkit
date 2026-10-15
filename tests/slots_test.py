@@ -1,5 +1,6 @@
 """Test Slot and Slots"""
 
+import logging
 import weakref
 
 import pytest
@@ -226,7 +227,7 @@ class TestSlots:
         assert not hasattr(obj, "value")
         assert obj3.value == 42
 
-    def test_slots_call_exception_logger(self):
+    def test_slots_call_exception_logger(self, caplog):
         """
         Test Slots.__call__ with exception and logger
         exception not managed
@@ -240,6 +241,10 @@ class TestSlots:
         slots.add(None, None, func)  # success
         slots.add(obj2.method, None, None)  # success
         slots.add(obj.error, None, None)  # fail -> log
-        slots(event)
+        with caplog.at_level(logging.ERROR, logger="eventkit.event"):
+            slots(event)
         assert not hasattr(obj, "value")
         assert obj2.value == 42
+        [record] = caplog.records
+        assert "caused exception for event" in record.getMessage()
+        assert record.exc_info is not None and record.exc_info[0] is ValueError

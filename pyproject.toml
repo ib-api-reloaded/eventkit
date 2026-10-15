@@ -92,7 +92,6 @@ ignore = [
 ]
 
 [tool.pytest.ini_options]
-log_cli = true
 asyncio_default_test_loop_scope = "session"
 
 [[tool.mypy.overrides]]

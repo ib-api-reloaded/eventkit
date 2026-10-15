@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import logging
 import subprocess
 import sys
 import textwrap
@@ -147,7 +148,12 @@ class FinalizerTest(unittest.TestCase):
         loop.close()  # a short-lived loop closed with the source still pending
 
         raised = []
-        with patch.object(sys, "unraisablehook", raised.append):
+        # asyncio itself reports the abandoned task; that is expected here.
+        with (
+            patch.object(sys, "unraisablehook", raised.append),
+            self.assertLogs("asyncio", logging.ERROR) as logs,
+        ):
             del source
             gc.collect()
         self.assertEqual(raised, [])
+        self.assertIn("Task was destroyed but it is pending", logs.output[0])

@@ -80,7 +80,7 @@ class Issue8EventLoop(unittest.TestCase):
 
     def test_run_inside_a_running_loop_explains_what_to_do(self):
         async def main():
-            Event.sequence([1]).run()
+            Event("e").run()  # no source task to leave behind
 
         loop = asyncio.new_event_loop()
         try:
