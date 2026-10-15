@@ -1434,7 +1434,8 @@ class Event:
         """
         Zip sources together: The i-th emit has the i-th value from
         each source as positional arguments. Only emits when each source has
-        emtted its i-th value and ends when any source ends::
+        emitted its i-th value, and ends as soon as a source has ended with
+        no value left to pair (no further tuple is possible)::
 
             source 1:    -a----b------------------c------d---e--f---|
             source 2:    --------1-------2-------3---------4-----|

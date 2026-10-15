@@ -3,13 +3,15 @@
 
 import asyncio
 import gc
+import logging
 import threading
 import unittest
 import warnings
 
+import eventkit
 from eventkit import Event, util
 from eventkit.ops.timing import Timeout
-from eventkit.ops.transform import Map
+from eventkit.ops.transform import Map, Mergemap
 from eventkit.util import get_event_loop
 
 from .virtual_clock import VirtualClockTestCase
@@ -207,3 +209,59 @@ class DisconnectTest(unittest.TestCase):
         source.emit(-2)
         self.assertEqual(seen, [1])
         self.assertIsNone(mapped._source)
+
+
+class OperatorEdgeTest(VirtualClockTestCase, unittest.TestCase):
+    def test_take_zero_is_done_at_once(self):
+        source = Event("source")
+        op = source.take(0)
+        self.assertTrue(op.done())
+        self.assertEqual(len(source), 0)  # never attached
+
+    def test_an_emap_attached_after_construction(self):
+        op = Mergemap(lambda x: Event.sequence([x, x * 10]))
+        Event.sequence([1, 2]).connect(op)
+        self.assertEqual(sorted(op.run()), [1, 2, 10, 20])
+
+    def test_a_cancelled_async_map_task_is_neither_value_nor_error(self):
+        async def slow(x):
+            await asyncio.sleep(10)
+            return x
+
+        source = Event("source")
+        mapped = source.map(slow)
+        seen, errors = [], []
+        mapped.connect(seen.append, error=lambda s, e: errors.append(e))
+        source.emit(1)
+        mapped._tasks[0].cancel()
+        with self.assertNoLogs(level=logging.ERROR):
+            self.loop.run_until_complete(asyncio.sleep(0.1))
+        self.assertEqual((seen, errors), ([], []))
+
+    def test_a_failing_async_map_emits_the_error_and_no_value(self):
+        async def boom(x):
+            raise ValueError(x)
+
+        source = Event("source")
+        mapped = source.map(boom)
+        seen, errors = [], []
+        mapped.connect(seen.append, error=lambda s, e: errors.append(e))
+        source.emit(1)
+        self.loop.run_until_complete(asyncio.sleep(0.1))
+        self.assertEqual(seen, [])
+        self.assertEqual([str(e) for e in errors], ["1"])
+
+    def test_an_unhandled_operator_error_is_logged_with_its_traceback(self):
+        source = Event("source")
+        source.map(abs)  # no error listener anywhere downstream
+        try:
+            raise ValueError("upstream")
+        except ValueError as error:
+            failure = error
+        with self.assertLogs("eventkit", logging.ERROR) as logs:
+            source.error_event.emit(source, failure)
+        self.assertIs(logs.records[0].exc_info[1], failure)
+
+
+def test_array_prod_is_exported():
+    assert eventkit.ArrayProd.__name__ == "ArrayProd"

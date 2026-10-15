@@ -38,7 +38,10 @@ class Op(Event):
         if len(self.error_event):
             self.error_event.emit(source, error)
         else:
-            logger.exception(error)
+            # Not inside an except block: pass the error for its traceback.
+            logger.error(
+                "Unhandled error from %s in %s: %r", source, self, error, exc_info=error
+            )
 
     def on_source_done(self, _source):
         if self._source is not None:

@@ -298,11 +298,14 @@ class Map(Op):
             Op.on_source_done(self, self._source)
 
     def _emit_task(self, task):
+        if task.cancelled():
+            return  # e.g. by Event.run() cleanup: no value, no error
         try:
             result = task.result()
         except Exception as error:
-            result = NO_VALUE
+            # Like a failing synchronous function: the error, and no value.
             self.error_event.emit(self, error)
+            return
         self.emit(result)
 
 
@@ -318,9 +321,16 @@ class Emap(Op):
         # Subscribe before linking the joiner to the source: with a source
         # that has already ended, the joiner ends right away.
         joiner.connect(self.emit, self.error_event.emit, self._on_joiner_done)
-        joiner.set_parent(source)
         if source is not None:
             self.set_source(source)
+
+    def set_source(self, source):
+        source = Event.create(source)
+        if self._source is None and self._joiner is not None:
+            # The source is the joiner's parent: its nested events go there,
+            # and the joiner ends once the source and they have all ended.
+            self._joiner.set_parent(source)
+        Op.set_source(self, source)
 
     def on_source(self, *args):
         obj = self._constr(*args)

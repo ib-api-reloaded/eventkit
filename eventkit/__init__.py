@@ -23,6 +23,7 @@ from .ops.array import (
     ArrayMax,
     ArrayMean,
     ArrayMin,
+    ArrayProd,
     ArrayStd,
     ArraySum,
 )
@@ -107,6 +108,7 @@ __all__ = [
     "ArrayMax",
     "ArrayMean",
     "ArrayMin",
+    "ArrayProd",
     "ArrayStd",
     "ArraySum",
     "AddableJoinOp",

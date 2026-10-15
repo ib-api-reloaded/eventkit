@@ -46,9 +46,13 @@ class Take(Op):
     _n: int
 
     def __init__(self, count=1, source=None):
-        Op.__init__(self, source)
+        Op.__init__(self)
         self._count = count
         self._n = 0
+        if count <= 0:
+            self.set_done()  # takes nothing: done at once, never attached
+        elif source is not None:
+            self.set_source(source)
 
     def on_source(self, *args):
         self._n += 1
