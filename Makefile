@@ -10,7 +10,7 @@ RELEASEKIT ?= releasekit
 # test-matrix: a subset of the configured Python versions, e.g. "3.13 3.15".
 PYTHONS ?=
 
-.PHONY: help ruff typecheck lint test test-matrix build release-check release publish-dry-run publish publish-test
+.PHONY: help ruff typecheck lint test test-matrix test-repeat build release-check release publish-dry-run publish publish-test
 
 help:
 	@echo "Targets:"
@@ -22,6 +22,7 @@ help:
 	@echo "  test-matrix     - run the tests on each configured Python version, each"
 	@echo "                    in its own .venvs/py<version> environment and time-boxed;"
 	@echo "                    logs in .venvs/logs/ (PYTHONS=\"3.13 3.15\" for a subset)"
+	@echo "  test-repeat     - the tests many times, to expose intermittent failures (TIMES, CONCURRENT)"
 	@echo "  build           - wheel and sdist into dist/"
 	@echo "  release-check   - every reason not to publish this version now"
 	@echo "  release         - checks, build from HEAD, smoke test; no upload"
@@ -43,6 +44,9 @@ test:
 
 test-matrix:
 	$(RELEASEKIT) matrix $(foreach v,$(PYTHONS),--python=$(v))
+
+test-repeat:
+	$(RELEASEKIT) repeat $(if $(TIMES),--times $(TIMES)) $(if $(CONCURRENT),--concurrent $(CONCURRENT))
 
 build:
 	uv build
