@@ -11,7 +11,7 @@ eventkit builds event-driven data pipelines on asyncio. It is published as
 | `util.py`          | `NO_VALUE`, `get_event_loop`, `main_thread_loop`, `schedule_awaitable`, `timerange`                          |
 | `ops/op.py`        | `Op`, the base class of every operator                                                                       |
 | `ops/create.py`    | sources: `Wait`, `Aiterate`, `Sequence`, `Repeat`, `Range`, `Timer`, `Timerange`, `Marble`                   |
-| `ops/transform.py` | `Map`, `PoolMap`, `Pluck`, `Enumerate`, `Chunk`, `ChunkWith`, ... and the `Emap` family                               |
+| `ops/transform.py` | `Map`, `PoolMap`, `Pluck`, `Enumerate`, `Chunk`, `ChunkWith`, ... and the `Emap` family                      |
 | `ops/select.py`    | `Filter`, `Skip`, `Take`, `TakeWhile`, `DropWhile`, `TakeUntil`, `Changes`, `Unique`, `Last`                 |
 | `ops/aggregate.py` | `Reduce` (`Min`, `Max`, `Sum`, `Product`, `Any`, `All`), `Count`, `Mean`, `Ema`, `Pairwise`, `List`, `Deque` |
 | `ops/array.py`     | `Array` (a NumPy window) and its reductions (`ArrayMean`, `ArrayStd`, ...)                                   |
