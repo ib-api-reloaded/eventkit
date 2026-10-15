@@ -5,19 +5,19 @@ eventkit builds event-driven data pipelines on asyncio. It is published as
 
 ## Layout
 
-| Module | Contents |
-|---|---|
-| `event.py` | `Event`, `event_class`, the listener store (`Slot`, `Slots`), `Event.run` |
-| `util.py` | `NO_VALUE`, `get_event_loop`, `main_thread_loop`, `schedule_awaitable`, `timerange` |
-| `ops/op.py` | `Op`, the base class of every operator |
-| `ops/create.py` | sources: `Wait`, `Aiterate`, `Sequence`, `Repeat`, `Range`, `Timer`, `Timerange`, `Marble` |
-| `ops/transform.py` | `Map`, `Pluck`, `Enumerate`, `Chunk`, `ChunkWith`, ... and the `Emap` family |
-| `ops/select.py` | `Filter`, `Skip`, `Take`, `TakeWhile`, `DropWhile`, `TakeUntil`, `Changes`, `Unique`, `Last` |
+| Module             | Contents                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `event.py`         | `Event`, `event_class`, the listener store (`Slot`, `Slots`), `Event.run`                                    |
+| `util.py`          | `NO_VALUE`, `get_event_loop`, `main_thread_loop`, `schedule_awaitable`, `timerange`                          |
+| `ops/op.py`        | `Op`, the base class of every operator                                                                       |
+| `ops/create.py`    | sources: `Wait`, `Aiterate`, `Sequence`, `Repeat`, `Range`, `Timer`, `Timerange`, `Marble`                   |
+| `ops/transform.py` | `Map`, `Pluck`, `Enumerate`, `Chunk`, `ChunkWith`, ... and the `Emap` family                                 |
+| `ops/select.py`    | `Filter`, `Skip`, `Take`, `TakeWhile`, `DropWhile`, `TakeUntil`, `Changes`, `Unique`, `Last`                 |
 | `ops/aggregate.py` | `Reduce` (`Min`, `Max`, `Sum`, `Product`, `Any`, `All`), `Count`, `Mean`, `Ema`, `Pairwise`, `List`, `Deque` |
-| `ops/array.py` | `Array` (a NumPy window) and its reductions (`ArrayMean`, `ArrayStd`, ...) |
-| `ops/combine.py` | `Fork`, `JoinOp`, `AddableJoinOp`, `Merge`, `Chain`, `Concat`, `Switch`, `Zip`, `Ziplatest` |
-| `ops/timing.py` | `Delay`, `Timeout`, `Debounce`, `Throttle`, `Sample` |
-| `ops/misc.py` | `Errors`, `EndOnError` |
+| `ops/array.py`     | `Array` (a NumPy window) and its reductions (`ArrayMean`, `ArrayStd`, ...)                                   |
+| `ops/combine.py`   | `Fork`, `JoinOp`, `AddableJoinOp`, `Merge`, `Chain`, `Concat`, `Switch`, `Zip`, `Ziplatest`                  |
+| `ops/timing.py`    | `Delay`, `Timeout`, `Debounce`, `Throttle`, `Sample`                                                         |
+| `ops/misc.py`      | `Errors`, `EndOnError`                                                                                       |
 
 `event.py` imports the operator classes at the bottom, after `Event` is
 defined, so that methods such as `Event.map` can construct them (hence
