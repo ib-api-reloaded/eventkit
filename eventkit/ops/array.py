@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from collections import deque
 from importlib import import_module
 from types import ModuleType
@@ -9,10 +10,19 @@ from ..event import event_class
 from ..util import NO_VALUE
 from .op import Op
 
-try:
-    np: ModuleType | None = import_module("numpy")
-except ImportError:
-    np = None
+
+@functools.cache
+def _numpy() -> ModuleType:
+    """numpy, imported when an Array operator is first created: it is the
+    optional ``aeventkit[numpy]`` extra, and ``import eventkit`` must not
+    pay for it."""
+    try:
+        return import_module("numpy")
+    except ImportError as error:
+        raise ImportError(
+            "numpy is required for Array operators. "
+            "Install it with: pip install aeventkit[numpy]"
+        ) from error
 
 
 @event_class
@@ -21,11 +31,7 @@ class Array(Op):
     _q: deque[Any]
 
     def __init__(self, count, source=None):
-        if np is None:
-            raise ImportError(
-                "numpy is required for Array operators. "
-                "Install it with: pip install aeventkit[numpy]"
-            )
+        _numpy()  # fail here, not at the first value, when numpy is missing
         Op.__init__(self, source)
         self._count = count
         self._q = deque()
@@ -34,7 +40,7 @@ class Array(Op):
         self._q.append(args[0] if len(args) == 1 else args or NO_VALUE)
         if self._count and len(self._q) > self._count:
             self._q.popleft()
-        self.emit(np.asarray(self._q))
+        self.emit(_numpy().asarray(self._q))
 
     def min(self) -> ArrayMin:  # type: ignore[override]
         """
@@ -118,7 +124,7 @@ class ArrayMean(Op):
 @event_class
 class ArrayStd(Op):
     def on_source(self, arg):
-        self.emit(arg.std(ddof=1) if len(arg) > 1 else np.nan)
+        self.emit(arg.std(ddof=1) if len(arg) > 1 else _numpy().nan)
 
 
 @event_class
