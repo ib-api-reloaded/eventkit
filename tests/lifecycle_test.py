@@ -134,6 +134,17 @@ class RunCleanupTest(VirtualClockTestCase, unittest.TestCase):
         self.assertEqual(ended, [True])
         self.assertTrue(source.done())
 
+    def test_run_stops_tasks_started_after_it_began_upstream_of_an_ended_part(self):
+        async def slow(x):
+            await asyncio.sleep(1 + x)  # the first ends long before the rest
+            return x
+
+        # The map's tasks start during the run; take(1) and the collector cut
+        # their links when they end, before run() cleans up.
+        mapped = Event.range(10).map(slow, ordered=False)
+        self.assertEqual(len(mapped.take(1).run()), 1)
+        self.assertTrue(all(task.done() for task in mapped._tasks))
+
     def test_wait_on_a_cancelled_future_ends_quietly(self):
         future = self.loop.create_future()
         waited = Event.wait(future)

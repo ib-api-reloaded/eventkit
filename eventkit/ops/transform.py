@@ -5,10 +5,11 @@ import copy
 import time
 from collections import deque
 from collections.abc import Callable, Iterator
+from concurrent.futures import Executor
 from typing import Any
 
 from ..event import Event, event_class
-from ..util import NO_VALUE, schedule_awaitable
+from ..util import NO_VALUE, get_event_loop, schedule_awaitable
 from .combine import Chain, Concat, Merge, Switch
 from .op import Op
 
@@ -307,6 +308,73 @@ class Map(Op):
             self.error_event.emit(self, error)
             return
         self.emit(result)
+
+
+def _run_chunk(func, chunk):
+    """Run ``func`` on each argument tuple of ``chunk`` in an executor
+    worker: ``(True, result)`` or ``(False, exception)`` per value, so one
+    failing value does not fail the others. Module level, so a process
+    pool can pickle it."""
+    outcomes = []
+    for args in chunk:
+        try:
+            outcomes.append((True, func(*args)))
+        except Exception as error:
+            outcomes.append((False, error))
+    return outcomes
+
+
+@event_class
+class PoolMap(Map):
+    """``map`` on a :class:`concurrent.futures.Executor`; see
+    :meth:`Event.poolmap`."""
+
+    _executor: Executor
+    _chunksize: int
+    _chunk: list[tuple[Any, ...]]
+
+    def __init__(
+        self, executor, func, timeout=None, chunksize=1, ordered=True, source=None
+    ):
+        if chunksize < 1:
+            raise ValueError(f"chunksize must be at least 1, not {chunksize}")
+        Map.__init__(self, func, timeout or 0, ordered)
+        self._executor = executor
+        self._chunksize = chunksize
+        self._chunk = []
+        if source is not None:
+            self.set_source(source)
+
+    def on_source(self, *args):
+        self._chunk.append(args)
+        if len(self._chunk) >= self._chunksize:
+            self._submit_chunk()
+
+    def on_source_done(self, source):
+        if self._chunk:
+            self._submit_chunk()  # the last, partial chunk
+        Map.on_source_done(self, source)
+
+    def _submit_chunk(self):
+        chunk, self._chunk = self._chunk, []
+        future = self._executor.submit(_run_chunk, self._func, chunk)
+        # Cancelling the asyncio future (timeout, Event.run() cleanup) also
+        # cancels the executor's, if it has not started.
+        self._create_task(asyncio.wrap_future(future, loop=get_event_loop()))
+
+    def _emit_task(self, task):
+        if task.cancelled():
+            return
+        try:
+            outcomes = task.result()
+        except Exception as error:  # the whole chunk: timeout, broken pool
+            self.error_event.emit(self, error)
+            return
+        for ok, value in outcomes:
+            if ok:
+                self.emit(value)
+            else:
+                self.error_event.emit(self, value)
 
 
 @event_class

@@ -7,6 +7,7 @@ import logging
 import types
 import weakref
 from collections.abc import AsyncIterable, Awaitable, Callable, Iterable
+from concurrent.futures import Executor
 from dataclasses import dataclass, field
 from typing import Any as AnyType
 from typing import (
@@ -33,17 +34,10 @@ _E = TypeVar("_E")
 _UPSTREAM_LINKS = ("_source", "_parent", "_timer", "_notifier", "_joiner")
 
 
-def _pipeline_tasks(event: Event) -> set[asyncio.Task]:
-    """Unfinished tasks of ``event`` and the events upstream of it that
-    only this pipeline uses.
-
-    Tasks are a source's ``_task`` and an async map's ``_tasks``. An
-    upstream event that also has a listener outside the pipeline (another
-    pipeline, a plain callback) is in use elsewhere, so its tasks are not
-    included.
-    """
+def _pipeline_nodes(roots: Iterable[Event]) -> dict[int, Event]:
+    """The events in ``roots`` and every event upstream of them."""
     nodes: dict[int, Event] = {}
-    stack = [event]
+    stack = list(roots)
     while stack:
         node = stack.pop()
         if id(node) in nodes:
@@ -54,7 +48,17 @@ def _pipeline_tasks(event: Event) -> set[asyncio.Task]:
             if isinstance(upstream, Event):
                 stack.append(upstream)
         stack.extend(getattr(node, "_sources", ()))
+    return nodes
 
+
+def _pipeline_tasks(nodes: dict[int, Event]) -> set[asyncio.Task]:
+    """Unfinished tasks of the pipeline ``nodes`` that only this pipeline
+    uses.
+
+    Tasks are a source's ``_task`` and an async map's ``_tasks``. An
+    event that also has a listener outside the pipeline (another pipeline,
+    a plain callback) is in use elsewhere, so its tasks are not included.
+    """
     tasks: set[asyncio.Task] = set()
     for node in nodes.values():
         if not _listened_to_only_by(node, nodes):
@@ -466,20 +470,22 @@ class Event:
         collector = ListOp()
         collector.connect(on_values, on_error, keep_ref=True)
         collector.set_source(self)
-        # Tasks this event's own pipeline started (sources, async maps);
-        # collected now, while every upstream link is still connected.
-        owned = _pipeline_tasks(collector)
+        # The events of this pipeline, found now while every upstream link is
+        # still connected (operators cut their links when they end).
+        nodes = _pipeline_nodes([collector])
+        owned = _pipeline_tasks(nodes)
 
         async def _run_and_clean():
             try:
                 return await result
             finally:
-                # The pipeline may have ended before some of its sources
-                # did (e.g. ``timeout``): stop what is left of it, and
+                # The pipeline may have ended before some of its parts did
+                # (e.g. ``timeout``, ``take``): stop what is left of it, and
                 # only that, so unrelated work on the loop keeps running.
-                leftover = [
-                    t for t in owned | _pipeline_tasks(collector) if not t.done()
-                ]
+                # Tasks started during the run are found on the same events
+                # and on events linked to them since (an emap's nested ones).
+                current = _pipeline_tasks(_pipeline_nodes(nodes.values()))
+                leftover = [t for t in owned | current if not t.done()]
                 for task in leftover:
                     task.cancel()
                 await asyncio.gather(*leftover, return_exceptions=True)
@@ -1097,7 +1103,9 @@ class Event:
 
             emit(a, b, ...) -> emit(await func(a, b, ...))
 
-        In case of timeout or other failure, ``NO_VALUE`` is emitted.
+        When ``func`` raises (or its awaitable fails or times out), the error
+        is emitted on ``error_event`` as ``(this event, exception)`` and no
+        value is emitted.
 
         Args:
             func: The function or coroutine constructor to apply.
@@ -1109,9 +1117,69 @@ class Event:
             task_limit: Max number of concurrent tasks, or None for no limit.
 
         ``timeout``, ``ordered`` and ``task_limit`` apply to
-        async functions only.
+        async functions only. To run ``func`` in other threads or
+        processes, see :meth:`poolmap`.
         """
         return Map(func, timeout, ordered, task_limit, source=self)
+
+    def poolmap(
+        self,
+        executor: Executor,
+        func,
+        *,
+        timeout: float | None = None,
+        chunksize: int = 1,
+        ordered: bool = True,
+    ) -> PoolMap:
+        """
+        Apply ``func`` to source values in a :mod:`concurrent.futures`
+        executor, so the work runs in parallel outside the event loop::
+
+            emit(a, b, ...) -> emit(func(a, b, ...))  # run by the executor
+
+        ``executor`` is any :class:`concurrent.futures.Executor`:
+
+        * :class:`~concurrent.futures.ProcessPoolExecutor`: CPU-bound work
+          on all cores (``func`` and the values must be picklable, so
+          ``func`` is a module-level function, not a lambda);
+        * :class:`~concurrent.futures.InterpreterPoolExecutor` (Python
+          3.14+): CPU-bound work in parallel subinterpreters;
+        * :class:`~concurrent.futures.ThreadPoolExecutor`: blocking I/O,
+          or CPU-bound work on a free-threaded Python build;
+        * any other executor with the same interface.
+
+        The executor belongs to the caller, who shuts it down; ``poolmap``
+        only submits to it::
+
+            import bz2
+            from concurrent.futures import ProcessPoolExecutor
+
+            with ProcessPoolExecutor() as pool:
+                sizes = (
+                    ev.Sequence(data).poolmap(pool, bz2.compress)
+                    .map(len).list().run()
+                )
+
+        As with :meth:`map`, an exception raised by ``func`` for a value is
+        emitted on ``error_event`` as ``(this event, exception)`` with no
+        value, and the other values are unaffected.
+
+        Args:
+            executor: The executor that runs ``func``.
+            func: A plain (not async) function.
+            timeout: Seconds a submitted chunk may take; when it is
+                exceeded, ``asyncio.TimeoutError`` is emitted as the error
+                of that chunk, and the chunk is cancelled if it has not
+                started yet. ``None``: no limit.
+            chunksize: Number of source values sent to the executor in one
+                submission. Larger chunks cut the per-call overhead of small
+                tasks (above all with processes); values are held until
+                their chunk is full or the source ends.
+            ordered:
+                * ``True``: results in the order of the source values;
+                * ``False``: results of each chunk as soon as it completes.
+        """
+        return PoolMap(executor, func, timeout, chunksize, ordered, source=self)
 
     def emap(self, constr, joiner: AddableJoinOp) -> Emap:
         """
@@ -1643,6 +1711,7 @@ from .ops.transform import (
     Partial,
     PartialRight,
     Pluck,
+    PoolMap,
     Previous,
     Star,
     Switchmap,

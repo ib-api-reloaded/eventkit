@@ -128,14 +128,27 @@ Output::
 
 `Full source code <https://github.com/erdewit/heartwave/blob/100e1a89d18756e141f9dcfbb73c55a1009debf4/heartwave/app.py#L88>`_
 
-Distributed computing
----------------------
+Parallel processing
+-------------------
 
-The `distex <https://github.com/erdewit/distex>`_ library adds a
-``poolmap`` operator that spreads work over several cores or machines.
-It depends on the original ``eventkit`` package (it was last released in
-2022), which provides the same ``eventkit`` module as ``aeventkit``:
-installing it replaces one with the other.
+``poolmap`` runs a function on the values of an event in a
+``concurrent.futures`` executor: a process pool for CPU-bound work on all
+cores, an interpreter pool (Python 3.14+), or a thread pool for blocking
+I/O. Results stay in order unless ``ordered=False``, and ``chunksize``
+batches small tasks:
+
+.. code-block:: python
+
+    import bz2
+    from concurrent.futures import ProcessPoolExecutor
+
+    import eventkit as ev
+
+    if __name__ == "__main__":
+        data = [b"A" * 1_000_000] * 1000
+        with ProcessPoolExecutor() as pool:
+            sizes = ev.Sequence(data).poolmap(pool, bz2.compress, chunksize=10).map(len)
+            print(sizes.mean().last().run())
 
 
 Inspired by:

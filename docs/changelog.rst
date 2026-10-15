@@ -61,9 +61,10 @@ Event loop
   * works on sources that end on their first step (an empty sequence) and
     on events that have already ended (returns ``[]``);
   * afterwards cancels what its own pipeline left running (for example a
-    source cut short by ``timeout``), including side inputs such as a
-    ``sample`` timer, and nothing else: sources with other listeners and
-    unrelated tasks keep running.
+    source cut short by ``timeout``, or async ``map`` tasks behind a
+    ``take``), including side inputs such as a ``sample`` timer and tasks
+    started during the run, and nothing else: sources with other listeners
+    and unrelated tasks keep running.
 
 Operators: changed behavior
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -90,6 +91,13 @@ Operators: changed behavior
 Operators: new
 ^^^^^^^^^^^^^^
 
+* ``poolmap(executor, func, *, timeout=None, chunksize=1, ordered=True)``
+  runs ``func`` on the values in any ``concurrent.futures`` executor: a
+  process pool for CPU-bound work, an interpreter pool (Python 3.14+) or a
+  thread pool. Values can be sent in chunks; a value whose call fails emits
+  its error and the rest of its chunk is unaffected; a timeout, or
+  ``run()`` cleanup, cancels work the executor has not started. The
+  executor stays the caller's: ``poolmap`` never shuts it down.
 * ``throttle(..., inclusive=True)`` lets the sum within an interval reach
   ``maximum`` (``throttle(10, 1, inclusive=True)`` passes up to 10 per
   second). The default, ``inclusive=False``, keeps it below ``maximum`` as

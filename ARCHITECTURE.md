@@ -11,7 +11,7 @@ eventkit builds event-driven data pipelines on asyncio. It is published as
 | `util.py`          | `NO_VALUE`, `get_event_loop`, `main_thread_loop`, `schedule_awaitable`, `timerange`                          |
 | `ops/op.py`        | `Op`, the base class of every operator                                                                       |
 | `ops/create.py`    | sources: `Wait`, `Aiterate`, `Sequence`, `Repeat`, `Range`, `Timer`, `Timerange`, `Marble`                   |
-| `ops/transform.py` | `Map`, `Pluck`, `Enumerate`, `Chunk`, `ChunkWith`, ... and the `Emap` family                                 |
+| `ops/transform.py` | `Map`, `PoolMap`, `Pluck`, `Enumerate`, `Chunk`, `ChunkWith`, ... and the `Emap` family                               |
 | `ops/select.py`    | `Filter`, `Skip`, `Take`, `TakeWhile`, `DropWhile`, `TakeUntil`, `Changes`, `Unique`, `Last`                 |
 | `ops/aggregate.py` | `Reduce` (`Min`, `Max`, `Sum`, `Product`, `Any`, `All`), `Count`, `Mean`, `Ema`, `Pairwise`, `List`, `Deque` |
 | `ops/array.py`     | `Array` (a NumPy window) and its reductions (`ArrayMean`, `ArrayStd`, ...)                                   |
@@ -79,8 +79,8 @@ never propagates to the caller of `emit`.
 Operators forward upstream errors unchanged, keeping the original source
 (`Op.on_source_error`), or log them when nobody listens. Sources and async
 maps report their own failures with themselves as source: `Wait` and
-`Aiterate` emit the error and end; an async `Map` emits the error and then
-`NO_VALUE` in place of the result. `run()`, `await event` and `async for`
+`Aiterate` emit the error and end; an async `Map` (and `PoolMap`, per value)
+emits the error and no value. `run()`, `await event` and `async for`
 raise the first error that reaches them.
 
 ## Operators
@@ -142,6 +142,18 @@ no source is left and no parent can add more (`_end_if_exhausted`).
 and adds it to the joiner, whose parent is the source. `Emap` ends when the
 joiner ends. `Mergemap`, `Chainmap`, `Concatmap` and `Switchmap` fix the
 joiner.
+
+### Executors
+
+`PoolMap` (`Event.poolmap`) is a `Map` whose work runs in a
+`concurrent.futures.Executor` owned by the caller. Source values are
+batched into chunks of `chunksize`; each chunk is one `executor.submit` of
+the module-level `_run_chunk` (picklable for process pools), which returns
+an `(ok, result-or-exception)` pair per value, so one failing value does
+not fail its chunk. The executor's future is wrapped with
+`asyncio.wrap_future` and handled as a `Map` task: ordering, the timeout
+(per chunk) and `run()` cleanup come from `Map`, and cancelling the
+wrapper cancels the executor's future if it has not started.
 
 ## Timing
 
