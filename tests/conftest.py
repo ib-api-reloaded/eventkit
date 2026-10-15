@@ -11,8 +11,10 @@ pytest's ``caplog``; anything else (a listener exception, a task left
 pending on a closed loop) is a defect, not noise.
 """
 
+import gc
 import logging
 import os
+import sys
 
 import pytest
 from hypothesis import settings
@@ -31,6 +33,15 @@ class _ErrorRecords(logging.Handler):
         self.records.append(record)
 
 
+def collect_garbage() -> None:
+    """Collect until objects freed by finalizers are gone too. CPython frees
+    most objects as soon as they are unreferenced, so one pass (for cycles)
+    is enough; PyPy frees only when collecting, and an object a finalizer
+    releases (a task held by a source) needs another pass."""
+    for _ in range(3 if sys.implementation.name == "pypy" else 1):
+        gc.collect()
+
+
 @pytest.fixture(autouse=True)
 def no_unexpected_error_logs(request):
     handler = _ErrorRecords()
@@ -44,6 +55,7 @@ def no_unexpected_error_logs(request):
     if handler.records and "caplog" not in request.fixturenames:
         messages = "\n".join(f"  {r.name}: {r.getMessage()}" for r in handler.records)
         pytest.fail(
-            "unexpected error logs (a leaked task can surface in a later "
-            f"test, when it is garbage-collected):\n{messages}"
+            "unexpected error logs (a task leaked by an earlier test is "
+            "reported when the garbage collector finds it, possibly during a "
+            f"later test):\n{messages}"
         )

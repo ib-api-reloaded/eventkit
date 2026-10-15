@@ -1,5 +1,4 @@
 import asyncio
-import gc
 import logging
 import subprocess
 import sys
@@ -12,6 +11,7 @@ from unittest.mock import patch
 from eventkit import Event
 from eventkit.util import get_event_loop
 
+from .conftest import collect_garbage
 from .virtual_clock import VirtualClockTestCase
 
 
@@ -154,6 +154,6 @@ class FinalizerTest(unittest.TestCase):
             self.assertLogs("asyncio", logging.ERROR) as logs,
         ):
             del source
-            gc.collect()
+            collect_garbage()  # PyPy needs more than one pass
         self.assertEqual(raised, [])
         self.assertIn("Task was destroyed but it is pending", logs.output[0])
