@@ -70,7 +70,7 @@ class TimeoutTest(VirtualClockTestCase, unittest.TestCase):
 class SkipTest(unittest.TestCase):
     def test_skip_keeps_working_without_another_reference(self):
         src = Event("src")
-        seen = []
+        seen: list[int] = []
         src.skip(1).connect(seen.append)
         src.emit(1)
         gc.collect()
@@ -113,7 +113,7 @@ class RunCleanupTest(VirtualClockTestCase, unittest.TestCase):
 
     def test_run_leaves_a_source_shared_with_another_pipeline_running(self):
         shared = Event.timer(0.1, count=10)
-        other = []
+        other: list[float] = []
         shared.connect(other.append)
         self.assertEqual(len(shared.take(2).run()), 2)
         self.loop.run_until_complete(asyncio.sleep(0.25))
@@ -158,7 +158,7 @@ class RunCleanupTest(VirtualClockTestCase, unittest.TestCase):
 class SkipZeroTest(unittest.TestCase):
     def test_skip_zero_passes_everything(self):
         src = Event("src")
-        seen = []
+        seen: list[int] = []
         op = src.skip(0)
         op.connect(seen.append)
         src.emit(1)
@@ -190,7 +190,8 @@ class MainThreadLoopTest(unittest.TestCase):
 
 class DisconnectTest(unittest.TestCase):
     def test_disconnect_undoes_one_connect(self):
-        event, seen = Event("e"), []
+        event = Event("e")
+        seen: list[int] = []
         event.connect(seen.append)
         event.connect(seen.append)
         event.disconnect(seen.append)
@@ -202,7 +203,9 @@ class DisconnectTest(unittest.TestCase):
         self.assertEqual(seen, [1])
 
     def test_disconnect_all_removes_every_connection_and_callbacks(self):
-        event, seen, done = Event("e"), [], []
+        event = Event("e")
+        seen: list[int] = []
+        done: list[Event] = []
         for _ in range(3):
             event.connect(seen.append, done=done.append)
         event.disconnect_all(seen.append, done=done.append)
@@ -212,7 +215,7 @@ class DisconnectTest(unittest.TestCase):
 
     def test_disconnect_detaches_an_operator_connected_with_connect(self):
         source, mapped = Event("source"), Map(abs)  # an operator without source
-        seen = []
+        seen: list[int] = []
         mapped.connect(seen.append)
         source.connect(mapped)
         source.emit(-1)
@@ -241,7 +244,8 @@ class OperatorEdgeTest(VirtualClockTestCase, unittest.TestCase):
 
         source = Event("source")
         mapped = source.map(slow)
-        seen, errors = [], []
+        seen: list[int] = []
+        errors: list[Exception] = []
         mapped.connect(seen.append, error=lambda s, e: errors.append(e))
         source.emit(1)
         mapped._tasks[0].cancel()
@@ -255,7 +259,8 @@ class OperatorEdgeTest(VirtualClockTestCase, unittest.TestCase):
 
         source = Event("source")
         mapped = source.map(boom)
-        seen, errors = [], []
+        seen: list[int] = []
+        errors: list[Exception] = []
         mapped.connect(seen.append, error=lambda s, e: errors.append(e))
         source.emit(1)
         self.loop.run_until_complete(asyncio.sleep(0.1))
@@ -271,7 +276,9 @@ class OperatorEdgeTest(VirtualClockTestCase, unittest.TestCase):
             failure = error
         with self.assertLogs("eventkit", logging.ERROR) as logs:
             source.error_event.emit(source, failure)
-        self.assertIs(logs.records[0].exc_info[1], failure)
+        exc_info = logs.records[0].exc_info
+        assert exc_info is not None
+        self.assertIs(exc_info[1], failure)
 
 
 def test_array_prod_is_exported():

@@ -56,7 +56,7 @@ class OperatorErrorTest(VirtualClockTestCase, unittest.TestCase):
         src = Event("src")
         op = src.end_on_error()
         seen = self.errors_of(op)
-        values = []
+        values: list[int] = []
         op.connect(values.append)
         src.emit(1)
         error = ErrorEvent("upstream")

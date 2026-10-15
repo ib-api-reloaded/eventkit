@@ -147,7 +147,7 @@ class FinalizerTest(unittest.TestCase):
         asyncio.set_event_loop(None)
         loop.close()  # a short-lived loop closed with the source still pending
 
-        raised = []
+        raised: list[sys.UnraisableHookArgs] = []
         # asyncio itself reports the abandoned task; that is expected here.
         with (
             patch.object(sys, "unraisablehook", raised.append),

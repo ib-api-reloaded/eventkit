@@ -29,6 +29,13 @@ Events
 * Events compare and hash by identity. Previously two distinct events
   with the same name and state compared equal (and hashed differently),
   so joins that look sources up by equality could act on the wrong one.
+* ``error_event`` and ``done_event`` are created when first used instead of
+  with every event, so an event nobody subscribes to for errors or for its
+  end costs two events less. They are typed ``Event`` (no longer
+  ``Event | None``), so ``event.error_event.connect(...)`` type-checks;
+  ``event.error_event += f`` works as before, and replacing a sub event
+  raises ``AttributeError``. The private constructor argument
+  ``_with_error_done_events`` is gone.
 * ``Event(name=...)`` works as documented; the constructor takes ``name``.
 * ``disconnect()`` (and ``-=``) undoes one ``connect()``: a listener
   connected twice stays connected once. The new ``disconnect_all()``
@@ -124,7 +131,9 @@ Operators: fixed
 * ``ArrayProd`` is exported, like the other Array operators.
 * ``throttle``: a value whose cost alone reaches the limit is emitted on
   its own once the interval is clear; it used to stall the queue and raise
-  ``IndexError``. Windows are released on time with one retry timer.
+  ``IndexError``. Windows are released on time with one retry timer. The
+  cost function is called once per value, on arrival (it was called again
+  on every attempt to emit a waiting value).
 * ``delay`` keeps values in order and ends after the last one; it forwards
   upstream errors (it raised ``TypeError`` on each).
 * ``end_on_error`` works; it called a method that did not exist.

@@ -9,6 +9,8 @@ interval finishes instantly.
 
 import asyncio
 import selectors
+import unittest
+from typing import TYPE_CHECKING
 
 
 class _InstantSelector(selectors.BaseSelector):
@@ -66,16 +68,27 @@ class VirtualClockLoop(asyncio.SelectorEventLoop):
         self._now = target
 
 
-class VirtualClockTestCase:
+# The mixin is always combined with ``unittest.TestCase``. For the type
+# checker it derives from it, so its ``super()`` calls resolve; at runtime it
+# stays a plain mixin.
+if TYPE_CHECKING:
+    _MixinBase = unittest.TestCase
+else:
+    _MixinBase = object
+
+
+class VirtualClockTestCase(_MixinBase):
     """Mixin for ``unittest.TestCase``: each test runs with a fresh
     :class:`VirtualClockLoop` set as the thread's event loop."""
 
-    def setUp(self):
+    loop: VirtualClockLoop
+
+    def setUp(self) -> None:
         super().setUp()
         self.loop = VirtualClockLoop()
         asyncio.set_event_loop(self.loop)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         # Stop whatever the test left running on its loop before closing it.
         pending = [t for t in asyncio.all_tasks(self.loop) if not t.done()]
         for task in pending:

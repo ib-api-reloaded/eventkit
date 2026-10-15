@@ -10,7 +10,7 @@ from typing import Any
 
 from ..event import Event, event_class
 from ..util import NO_VALUE, get_event_loop, schedule_awaitable
-from .combine import Chain, Concat, Merge, Switch
+from .combine import AddableJoinOp, Chain, Concat, Merge, Switch
 from .op import Op
 
 
@@ -39,7 +39,7 @@ class Iterate(Op):
             value = next(self._it)
             self.emit(value)
         except StopIteration:
-            self._disconnect_from(self._source)
+            self._detach()
             self.set_done()
 
 
@@ -192,7 +192,7 @@ class Chunk(Op):
 @event_class
 class ChunkWith(Op):
     _timer: Event | None
-    _list: list[Any] | None
+    _list: list[Any]
     _emit_empty: bool
 
     def __init__(self, timer, emit_empty, source=None):
@@ -215,7 +215,7 @@ class ChunkWith(Op):
     def on_source_done(self, source):
         if self._list:
             self.emit(self._list)
-            self._list = None
+            self._list = []
 
         if self._timer is not None:
             self._timer.disconnect(
@@ -380,7 +380,7 @@ class PoolMap(Map):
 @event_class
 class Emap(Op):
     _constr: Callable[..., Any]
-    _joiner: Event | None
+    _joiner: AddableJoinOp | None
 
     def __init__(self, constr, joiner, source=None):
         Op.__init__(self)
@@ -403,7 +403,8 @@ class Emap(Op):
     def on_source(self, *args):
         obj = self._constr(*args)
         event = self.create(obj)
-        self._joiner.add_source(event)
+        if self._joiner is not None:  # None once it has ended
+            self._joiner.add_source(event)
 
     def on_source_done(self, source):
         pass
@@ -411,9 +412,7 @@ class Emap(Op):
     def _on_joiner_done(self, joiner):
         joiner.disconnect(self.emit, self.error_event.emit, self._on_joiner_done)
         self._joiner = None
-        if self._source is not None:
-            self._disconnect_from(self._source)
-            self._source = None
+        self._detach()
         self.set_done()
 
 

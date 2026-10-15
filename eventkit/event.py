@@ -88,7 +88,7 @@ def _listened_to_only_by(event: Event, nodes: dict[int, Event]) -> bool:
 class Slot:
     obj: AnyType
     weakref: Callable[[], AnyType] | None
-    func: Callable[[AnyType], AnyType]
+    func: Callable[..., AnyType] | None
 
 
 @dataclass(slots=True)
@@ -165,10 +165,10 @@ class Slots:
 
                 result = None
                 if obj is None:
-                    if func:
+                    if func is not None:
                         result = func(*args, **kwargs)
                 else:
-                    if func:
+                    if func is not None:
                         result = func(obj, *args, **kwargs)
                     else:
                         result = obj(*args, **kwargs)
@@ -181,7 +181,7 @@ class Slots:
                 # It's not really clear in the documentation or usage that exceptions
                 # get returned via an 'error_event' callback. We should make sure
                 # people know this clearly so event handler callback errors are noticed.
-                if caller.error_event is not None and len(caller.error_event):
+                if caller._errors_have_listeners():
                     caller.error_event.emit(caller, error)
                 else:
                     logger.exception(
@@ -211,14 +211,10 @@ class Event:
     """
 
     _name: str
-    _with_error_done_events: bool
-
-    # Sub event that emits errors from this event as ``emit(source, exception)``.
-    error_event: Event | None
-
-    # Sub event that emits when this event is done as ``emit(source)``.
-    done_event: Event | None
-
+    # The sub-events, created on first use (see error_event, done_event):
+    # most events never need them.
+    _error_event: Event | None
+    _done_event: Event | None
     _value: AnyType
     _slots: Slots
     _done: bool
@@ -227,20 +223,54 @@ class Event:
 
     NO_VALUE: ClassVar[_NoValue] = NO_VALUE
 
-    def __init__(self, name: str = "", _with_error_done_events: bool = True):
+    def __init__(self, name: str = ""):
         self._name = name or type(self).__qualname__
-        self._with_error_done_events = _with_error_done_events
+        self._error_event = None
+        self._done_event = None
         self._value = NO_VALUE
         self._slots = Slots()
         self._done = False
         self._source = None
         self._task = None
-        if _with_error_done_events:
-            self.error_event = Event("error", False)
-            self.done_event = Event("done", False)
-        else:
-            self.error_event = None
-            self.done_event = None
+
+    @property
+    def error_event(self) -> Event:
+        """
+        Sub event that emits the errors of this event as
+        ``emit(source, exception)``. Created when first used.
+        """
+        if self._error_event is None:
+            self._error_event = Event("error")
+        return self._error_event
+
+    # ``event.error_event += f`` reads, connects, and assigns the same sub
+    # event back; that write is accepted, a different event is not.
+    @error_event.setter
+    def error_event(self, value: Event) -> None:
+        if value is not self.error_event:
+            raise AttributeError("error_event cannot be replaced")
+
+    @property
+    def done_event(self) -> Event:
+        """
+        Sub event that emits this event, once, when it ends, and then ends
+        too. Created when first used; for an event that has already ended
+        it is created ended.
+        """
+        if self._done_event is None:
+            self._done_event = Event("done")
+            self._done_event._done = self._done
+        return self._done_event
+
+    @done_event.setter
+    def done_event(self, value: Event) -> None:
+        if value is not self.done_event:
+            raise AttributeError("done_event cannot be replaced")
+
+    def _errors_have_listeners(self) -> bool:
+        """Whether emitting on ``error_event`` would reach anyone (without
+        creating it)."""
+        return self._error_event is not None and len(self._error_event) > 0
 
     def name(self) -> str:
         """
@@ -262,10 +292,10 @@ class Event:
         """
         if not self._done:
             self._done = True
-            if self.done_event:
-                # done event emits and set to done too
-                self.done_event.emit(self)
-                self.done_event.set_done()
+            done_event = self._done_event
+            if done_event is not None:  # nobody listens to one never created
+                done_event.emit(self)
+                done_event.set_done()
 
     def value(self):
         """
@@ -325,10 +355,10 @@ class Event:
 
         self._slots.add(obj, ref, func)
 
-        if self.done_event and done is not None:
+        if done is not None:
             self.done_event.connect(done)
 
-        if self.error_event and error is not None:
+        if error is not None:
             self.error_event.connect(error)
 
         return self
@@ -376,11 +406,11 @@ class Event:
         obj, func = self._split(listener)
         self._slots.remove(obj, func, every=every)
 
-        if self.done_event and done is not None:
-            self.done_event._disconnect(done, None, None, every=every)
+        if self._done_event is not None and done is not None:
+            self._done_event._disconnect(done, None, None, every=every)
 
-        if self.error_event and error is not None:
-            self.error_event._disconnect(error, None, None, every=every)
+        if self._error_event is not None and error is not None:
+            self._error_event._disconnect(error, None, None, every=every)
 
         return self
 
@@ -395,11 +425,11 @@ class Event:
         """
         self._slots.remove_obj(obj)
 
-        if self.error_event is not None:
-            self.error_event.disconnect_obj(obj)
+        if self._error_event is not None:
+            self._error_event.disconnect_obj(obj)
 
-        if self.done_event is not None:
-            self.done_event.disconnect_obj(obj)
+        if self._done_event is not None:
+            self._done_event.disconnect_obj(obj)
 
     def emit(self, *args):
         """
@@ -686,7 +716,7 @@ class Event:
         if self.done():
             raise ValueError("Event already done")
 
-        fut = asyncio.Future()
+        fut: asyncio.Future[AnyType] = asyncio.get_running_loop().create_future()
         self.connect(on_event, on_error)
         fut.add_done_callback(on_future_done)
         return fut.__await__()
@@ -711,12 +741,9 @@ class Event:
 
     def __reduce__(self):
         """
-        Don't pickle slots.
+        Pickle as a new event of the same name: listeners are not pickled.
         """
-        with_error_done_event = (
-            self.error_event is not None or self.done_event is not None
-        )
-        return self.__class__, (self._name, with_error_done_event)
+        return self.__class__, (self._name,)
 
     @staticmethod
     def init(obj, event_names: Iterable):

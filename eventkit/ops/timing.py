@@ -34,9 +34,7 @@ class Delay(Op):
         self._schedule(self.error_event.emit, (source, error))
 
     def on_source_done(self, source):
-        if self._source is not None:
-            self._disconnect_from(self._source)
-            self._source = None
+        self._detach()
         self._schedule(self.set_done, ())
 
     def _schedule(self, callback, args):
@@ -100,16 +98,15 @@ class Timeout(Op):
         self._handle = loop.call_at(self._last_time + self._timeout, self._on_timer)
 
     def _on_timer(self):
-        if self.done():
+        handle = self._handle
+        if self.done() or handle is None:
             # Ended another way (e.g. attached to a finished source).
             return
         # Expired unless a value arrived after this timer was set: compare
         # with the deadline the timer was scheduled for, not the clock,
         # which asyncio may read up to one clock tick before it.
-        if self._last_time + self._timeout <= self._handle.when():
-            if self._source is not None:
-                self._disconnect_from(self._source)
-                self._source = None
+        if self._last_time + self._timeout <= handle.when():
+            self._detach()
             self.emit()
             self.set_done()
         else:
@@ -167,9 +164,9 @@ class Throttle(Op):
     _inclusive: bool  # the total may reach the maximum (else stays below it)
     _interval: float
     _cost_func: Callable[..., float] | None
-    _q: deque[tuple[tuple[Any, ...], float | None]]
-    _time_q: deque[float]
-    _cost_q: deque[float | None]
+    _q: deque[tuple[tuple[Any, ...], float]]  # waiting (args, cost)
+    _time_q: deque[float]  # emit times inside the window
+    _cost_q: deque[float]  # their costs (1 each without a cost function)
     _is_throttling: bool
     _handle: asyncio.TimerHandle | None
 
@@ -186,9 +183,9 @@ class Throttle(Op):
         self._inclusive = inclusive
         self._interval = interval
         self._cost_func = cost_func
-        self._q = deque()  # deque of (args, cost) tuples
-        self._time_q = deque()  # deque of previous emit times
-        self._cost_q = deque()  # deque of costs of previous emits
+        self._q = deque()
+        self._time_q = deque()
+        self._cost_q = deque()
         self._is_throttling = False
         self._handle = None  # the one pending retry, if any
         if source is not None:
@@ -205,9 +202,9 @@ class Throttle(Op):
             self._inclusive = inclusive
 
     def on_source(self, *args):
-        cost = self._cost_func
-        if cost is not None:
-            cost = cost(*args)
+        # The cost is taken once, on arrival; without a cost function the
+        # limit counts values.
+        cost = 1.0 if self._cost_func is None else self._cost_func(*args)
         self._q.append((args, cost))
         self._try_emit()
 
@@ -221,8 +218,10 @@ class Throttle(Op):
     def _on_retry(self):
         # The window has moved on by at least this timer's deadline, even
         # if asyncio runs the timer up to one clock tick before it.
-        deadline = self._handle.when()
-        self._handle = None
+        handle, self._handle = self._handle, None
+        if handle is None:
+            return
+        deadline = handle.when()
         self._try_emit(deadline)
 
     def _try_emit(self, not_before=None):
@@ -242,12 +241,7 @@ class Throttle(Op):
         # emit values while not exceeding the limit
         while q:
             args, cost = q[0]
-            if self._cost_func:
-                cost = self._cost_func(*args)
-                total_cost = cost + sum(costs)
-            else:
-                cost = None
-                total_cost = 1 + len(costs)
+            total_cost = cost + sum(costs)
             # Over budget: wait, unless the window is empty (a value whose
             # cost alone reaches the maximum then goes out on its own).
             over = (

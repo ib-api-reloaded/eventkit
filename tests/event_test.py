@@ -1,7 +1,9 @@
 import asyncio
 import gc
+import math
 import platform
 import unittest
+import weakref
 
 import eventkit as ev
 from eventkit import Event
@@ -78,6 +80,9 @@ class EventTest(unittest.TestCase):
         self.assertEqual(len(event), 0)
 
     def test_function(self):
+        value1 = 0
+        value2 = 0
+
         def f1(x, y):
             nonlocal value1
             value1 += x - y
@@ -86,8 +91,6 @@ class EventTest(unittest.TestCase):
             nonlocal value2
             value2 += x - y
 
-        value1 = 0
-        value2 = 0
         event = Event("test")
         event += f1
         event.emit(9, 4)
@@ -103,35 +106,32 @@ class EventTest(unittest.TestCase):
         self.assertEqual(len(event), 0)
 
     def test_cmethod(self):
-        import math
-
         event = Event("test")
         event += math.pow
         event.emit(2, 8)
 
     def test_keep_ref(self):
-        import weakref
-
         obj = Object()
         event = Event("test")
         event.connect(obj.method, keep_ref=True)
         wr = weakref.ref(obj)
         del obj
         event.emit(9, 4)
-        self.assertEqual(wr().value, 5)
-        obj = wr()
+        kept = wr()
+        assert kept is not None
+        self.assertEqual(kept.value, 5)
         event.emit(5, 6)
-        self.assertEqual(obj.value, 4)
-        self.assertIn(obj.method, event)
-        event -= obj.method
-        self.assertNotIn(obj.method, event)
+        self.assertEqual(kept.value, 4)
+        self.assertIn(kept.method, event)
+        event -= kept.method
+        self.assertNotIn(kept.method, event)
 
     def test_coro_func(self):
         async def coro(d):
             result.append(d)
             await asyncio.sleep(0)
 
-        result = []
+        result: list[int] = []
         event = Event("test")
         event += coro
 
@@ -163,9 +163,9 @@ class EventTest(unittest.TestCase):
         )
 
     def test_operator_connect(self):
-        result = []
+        result: list[int] = []
         ev1 = Event()
-        ev2 = ev.Map(lambda x: x + 10)
+        ev2: Event = ev.Map(lambda x: x + 10)
         ev2 += result.append
         ev1 += ev2
         for i in range(10):
@@ -177,7 +177,7 @@ class EventTest(unittest.TestCase):
             result.append(d)
             await asyncio.sleep(0)
 
-        result = []
+        result: list[int] = []
         event = Event("test")
         event += coro
 

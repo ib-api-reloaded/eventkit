@@ -384,7 +384,7 @@ class ListenerMachine(RuleBasedStateMachine):
     def __init__(self):
         super().__init__()
         self.event = Event("e")
-        self.calls = []
+        self.calls: list[tuple[int, int]] = []
         self.listeners = [_listener(i, self.calls) for i in range(4)]
         self.connected = []  # model: listener indexes, in connection order
 

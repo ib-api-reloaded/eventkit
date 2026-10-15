@@ -53,7 +53,7 @@ class TransformTest(unittest.TestCase):
         def f(i, j):
             r.append((i, j))
 
-        r = []
+        r: list[tuple[int, int]] = []
         event = Event.sequence(array).map(lambda i: (i, i)).star().connect(f)
         self.assertEqual(event.run(), r)
 
@@ -83,7 +83,7 @@ class TransformTest(unittest.TestCase):
         self.assertEqual(event.run(), [i * i for i in array])
 
     def test_sync_star_map(self):
-        event = Event.sequence(array)
+        event: Event = Event.sequence(array)
         event = event.map(lambda i: (i, i)).star().map(lambda x, y: x / 2 - y)
         self.assertEqual(event.run(), [x / 2 - y for x, y in zip(array, array)])
 
@@ -157,14 +157,14 @@ class TransformTest(unittest.TestCase):
     def test_map_with_future(self):
         """Verify that Map correctly handles functions that return a Future."""
         # Create a future that we will complete manually
-        my_future = asyncio.Future()
+        my_future: asyncio.Future[int] = asyncio.Future()
 
         # The map function will just return our future
         def map_func(x):
             return my_future
 
         event = Event.sequence([1]).map(map_func)
-        result = []
+        result: list[int] = []
         event.connect(result.append)
 
         # Give the event loop a chance to run the map

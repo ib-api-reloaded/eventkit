@@ -41,7 +41,7 @@ def test_every_class_is_a_slotted_dataclass(cls):
 def test_events_have_no_instance_dict():
     for event in (Event("e"), Event("e").map(abs), Event("e").errors()):
         with pytest.raises(AttributeError):
-            event.undeclared = 1
+            setattr(event, "undeclared", 1)  # not a declared field
 
 
 def test_events_are_compared_and_hashed_by_identity():
@@ -81,8 +81,8 @@ def test_upgrade_guide_subclass_examples():
     quote = QuoteEvent("AAPL")
     assert (quote.name(), quote.symbol) == ("quote", "AAPL")
     with pytest.raises(AttributeError):
-        quote.undeclared = 1
-    seen = []
+        setattr(quote, "undeclared", 1)  # not a declared field
+    seen: list[int] = []
     quote.connect(seen.append)
     quote.emit(1)
     assert seen == [1]
@@ -91,5 +91,45 @@ def test_upgrade_guide_subclass_examples():
         pass
 
     legacy = Legacy("legacy")
-    legacy.anything = 1  # an undecorated subclass has a __dict__
-    assert legacy.anything == 1
+    # An undecorated subclass has a __dict__; the attribute is not declared.
+    setattr(legacy, "anything", 1)
+    assert getattr(legacy, "anything") == 1
+
+
+def test_sub_events_are_created_on_first_use():
+    event = Event("e")
+    assert event._error_event is None and event._done_event is None
+    errors = event.error_event
+    assert event.error_event is errors  # one, from then on
+    assert event._done_event is None
+
+
+def test_sub_events_support_augmented_assignment_but_not_replacement():
+    event = Event("e")
+    seen: list[Event] = []
+    event.done_event += seen.append
+    event.error_event += seen.append
+    event.set_done()
+    assert seen == [event]
+    event.done_event -= seen.append
+    with pytest.raises(AttributeError, match="cannot be replaced"):
+        event.done_event = Event("other")
+
+
+def test_done_event_of_an_event_that_already_ended_is_ended():
+    event = Event("e")
+    event.set_done()  # no done_event yet: nothing to emit
+    assert event._done_event is None
+    assert event.done_event.done()
+
+
+def test_a_listener_error_with_no_error_sub_event_does_not_create_one(caplog):
+    event = Event("e")
+
+    def failing(*args):
+        raise ValueError("boom")
+
+    event += failing
+    event.emit(1)
+    assert event._error_event is None
+    assert "boom" in caplog.text

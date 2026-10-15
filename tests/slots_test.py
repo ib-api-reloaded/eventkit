@@ -77,6 +77,7 @@ class TestSlot:
 
         slot_obj = Slot(None, None, func)
         #
+        assert slot_obj.func is not None
         assert slot_obj.func() == 42
 
     def test_slot_weakref(self):
@@ -88,6 +89,7 @@ class TestSlot:
         #
         assert slot1.obj() == 42
         del obj
+        assert slot2.weakref is not None
         assert slot2.weakref().method() == 42
 
 
@@ -235,7 +237,7 @@ class TestSlots:
         slots = Slots()
 
         # no error_event
-        event = Event("test_slots_call_exception_logger", False)
+        event = Event("test_slots_call_exception_logger")
         obj = Obj()
         obj2 = Obj()
         slots.add(None, None, func)  # success

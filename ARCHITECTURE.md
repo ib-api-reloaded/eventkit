@@ -36,8 +36,12 @@ events remain weakly referenceable.
 An event holds a name (default: the class's qualified name), its last
 emitted arguments (`value()`), a `done()` flag, and two sub-events:
 `error_event` emits `(source, error)`, and `done_event` emits the event once,
-when `set_done()` is first called. `NO_VALUE` is a falsy singleton meaning
-"no value" (for example the value of an empty emit).
+when `set_done()` is first called. Both are properties that create the sub
+event on first use (`_error_event`, `_done_event` stay `None` until then):
+emitting on one that was never created would reach nobody, so `set_done()`
+and error delivery skip it, and a `done_event` created after the event ended
+is created ended. `NO_VALUE` is a falsy singleton meaning "no value" (for
+example the value of an empty emit).
 
 ## Listeners
 

@@ -93,8 +93,7 @@ class AddableJoinOp(JoinOp):
             self._end_if_exhausted()
             return
         self._parent = parent
-        if parent.done_event:
-            parent.done_event += self._on_parent_done
+        parent.done_event += self._on_parent_done
 
     def on_source_done(self, source):
         self._disconnect_from(source)
@@ -102,8 +101,7 @@ class AddableJoinOp(JoinOp):
         self._end_if_exhausted()
 
     def _on_parent_done(self, parent):
-        if parent.done_event:
-            parent.done_event -= self._on_parent_done
+        parent.done_event -= self._on_parent_done
         self._parent = None
         self._end_if_exhausted()
 
@@ -214,11 +212,11 @@ class Chain(AddableJoinOp):
         if not self._sources:
             self._connect_from(source)
         else:
+            q: deque[tuple[Any, ...]] = deque()
 
             def cb(*args):
                 q.append(args)
 
-            q = deque()
             self._qq.append(q)
             # Values wait their turn; errors are passed on right away.
             source.connect(cb, self.on_source_error)
@@ -250,7 +248,7 @@ class Zip(JoinOp):
     _inputs: list[Event]  # the sources by position (one may appear twice)
     _results: list[deque[Any]]
     _ended: set[int]  # positions whose source has ended
-    _source2cbs: defaultdict[Event, list[Callable[..., None]]] | None
+    _source2cbs: defaultdict[Event, list[Callable[..., None]]]
     _num_ready: int
 
     def __init__(self, *sources):
@@ -298,10 +296,10 @@ class Zip(JoinOp):
         further tuple is possible."""
         if self._done or not any(not self._results[i] for i in self._ended):
             return
-        for source, cbs in (self._source2cbs or {}).items():
+        for source, cbs in self._source2cbs.items():
             for cb in cbs:
                 source.disconnect(cb, self.on_source_error, self.on_source_done)
-        self._source2cbs = None
+        self._source2cbs.clear()
         self.set_done()
 
 
@@ -309,7 +307,7 @@ class Zip(JoinOp):
 class Ziplatest(JoinOp):
     _values: list[Any]
     _is_primed: bool
-    _source2cbs: defaultdict[Event, list[Callable[..., None]]] | None
+    _source2cbs: defaultdict[Event, list[Callable[..., None]]]
 
     def __init__(self, *sources, partial=True):
         JoinOp.__init__(self)
@@ -319,15 +317,15 @@ class Ziplatest(JoinOp):
             self._set_sources(*sources)
 
     def _set_sources(self, *sources):
-        sources = [Event.create(s) for s in sources]
-        self._sources = deque(s for s in sources if not s.done())
+        events = [Event.create(s) for s in sources]
+        self._sources = deque(e for e in events if not e.done())
         if not self._sources:
             self.set_done()
             return
         # One position per source, finished ones included (they keep their
         # last value); callbacks index into these positions.
-        self._values = [s.value() for s in sources]
-        for i, source in enumerate(sources):
+        self._values = [e.value() for e in events]
+        for i, source in enumerate(events):
             if source.done():
                 continue
             cb = functools.partial(self._on_source_i, i)
@@ -347,5 +345,5 @@ class Ziplatest(JoinOp):
             for source, cbs in self._source2cbs.items():
                 for cb in cbs:
                     source.disconnect(cb, self.on_source_error, self.on_source_done)
-            self._source2cbs = None
+            self._source2cbs.clear()
             self.set_done()

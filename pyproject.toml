@@ -94,6 +94,10 @@ ignore = [
 [tool.pytest.ini_options]
 asyncio_default_test_loop_scope = "session"
 
+[tool.mypy]
+# Check every function body, annotated or not.
+check_untyped_defs = true
+
 [[tool.mypy.overrides]]
 module = ["numpy"]
 ignore_missing_imports = true

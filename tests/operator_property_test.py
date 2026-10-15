@@ -16,6 +16,7 @@ import asyncio
 import operator
 import time
 from collections import deque
+from typing import Any
 
 import pytest
 from hypothesis import example, given, settings
@@ -83,7 +84,8 @@ def emap_scripts(draw):
             max_size=25,
         )
     )
-    script, created, outer_ended, ended = [], 0, False, set()
+    script: list[tuple[int | str, int | str]] = []
+    created, outer_ended, ended = 0, False, set()
     for kind, index, value in raw:
         if kind <= 1:
             if outer_ended or created == 4:
@@ -118,6 +120,8 @@ def play(build, script, n=None):
     returns a fresh plain event per parent value.
     """
     with virtual_loop(), no_logged_errors():
+        outer: Event | None
+        nested: list[Event]
         if n is None:
             outer, nested = Event("outer"), []
 
@@ -129,10 +133,13 @@ def play(build, script, n=None):
         else:
             outer, nested = None, [Event(f"source{i}") for i in range(n)]
             op = build(nested)
-        out, late, snapshots = [], [], []
+        out: list[tuple[Any, ...]] = []
+        late: list[tuple[Any, ...]] = []
+        snapshots = []
         op.connect(lambda *args: (late if op.done() else out).append(args))
         for who, value in script:
             target = outer if who == OUTER else nested[who]
+            assert target is not None  # joins have no OUTER actions
             if value == END:
                 target.set_done()
             else:
@@ -284,7 +291,8 @@ def test_switch_moves_to_whichever_source_emits(case):
 def zip_model(n, script):
     """Pairs, and (reading of "ends when any source ends") done once a
     source has ended with all its values paired: nothing more can pair."""
-    queues, ended, out, snapshots = [deque() for _ in range(n)], set(), [], []
+    queues: list[deque[int]] = [deque() for _ in range(n)]
+    ended, out, snapshots = set(), [], []
     for i, v in script:
         if v == END:
             ended.add(i)
@@ -373,7 +381,8 @@ def test_join_with_an_ended_source_follows_the_live_one(name, ended_first, value
         ended.set_done()
         sources = [ended, live] if ended_first else [live, ended]
         op = getattr(sources[0], name)(*sources[1:])
-        out, late = [], []
+        out: list[tuple[int, ...]] = []
+        late: list[tuple[int, ...]] = []
         op.connect(lambda *args: (late if op.done() else out).append(args))
         for v in values:
             live.emit(v)
@@ -460,7 +469,8 @@ def test_emap_skips_a_nested_event_that_has_already_ended(name, values):
         nested = iter([ended, live])
         outer = Event("outer")
         op = getattr(outer, name)(lambda _: next(nested))
-        out, late = [], []
+        out: list[tuple[int, ...]] = []
+        late: list[tuple[int, ...]] = []
         op.connect(lambda *args: (late if op.done() else out).append(args))
         outer.emit(0)
         outer.emit(1)
@@ -584,7 +594,7 @@ NESTED = st.lists(st.lists(st.integers(), max_size=3), max_size=4)
 def test_copy_emits_equal_shallow_copies(values):
     with virtual_loop(), no_logged_errors():
         source = Event("source")
-        out = []
+        out: list[list[list[int]]] = []
         source.copy().connect(out.append)
         for value in values:
             source.emit(value)
@@ -598,7 +608,7 @@ def test_copy_emits_equal_shallow_copies(values):
 def test_deepcopy_emits_equal_deep_copies(values):
     with virtual_loop(), no_logged_errors():
         source = Event("source")
-        out = []
+        out: list[list[list[int]]] = []
         source.deepcopy().connect(out.append)
         for value in values:
             source.emit(value)
@@ -646,7 +656,7 @@ def test_product(values, start):
 
 
 def _ema_model(values, weight):
-    out = []
+    out: list[float] = []
     for v in values:
         out.append(v if not out else (1 - weight) * out[-1] + weight * v)
     return out
@@ -801,7 +811,7 @@ def test_iterate_ends_on_the_first_source_value_it_has_no_item_for(items, count)
     with virtual_loop(), no_logged_errors():
         source = Event("source")
         op = source.iterate(iter(items))
-        out = []
+        out: list[int] = []
         op.connect(out.append)
         for k in range(count):
             source.emit(k)
@@ -824,8 +834,8 @@ async def _failing(values, error):
 
 
 async def _nothing():
-    for v in ():
-        yield v
+    return
+    yield  # an async generator that yields nothing
 
 
 def _later(values):
@@ -933,7 +943,7 @@ def test_run_raises_the_error_of_a_failing_source(values):
     with virtual_loop() as loop, no_logged_errors():
         error = ValueError("source")
         source = Event.aiterate(_failing(values, error))
-        seen = []
+        seen: list[int] = []
         source.connect(seen.append)
         with pytest.raises(ValueError) as raised:
             bounded_run(loop, source)

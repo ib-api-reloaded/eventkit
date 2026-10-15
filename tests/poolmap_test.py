@@ -11,6 +11,7 @@ import time
 import unittest
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from typing import Any
 
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -46,7 +47,8 @@ def drive(build, limit=10.0):
     error instead)."""
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    values, errors = [], []
+    values: list[Any] = []
+    errors: list[tuple[Event, Exception]] = []
     try:
         op = build()
         op.connect(
@@ -110,7 +112,9 @@ class PoolMapTest(unittest.TestCase):
         hasattr(concurrent.futures, "InterpreterPoolExecutor"), "Python 3.14+"
     )
     def test_interpreter_pool(self):
-        with concurrent.futures.InterpreterPoolExecutor(2) as pool:
+        # Looked up by name: the executor exists only on Python 3.14+.
+        executor = getattr(concurrent.futures, "InterpreterPoolExecutor")
+        with executor(2) as pool:
             result = run(lambda: Event.range(10).poolmap(pool, abs, chunksize=4))
         self.assertEqual(result, list(range(10)))
 

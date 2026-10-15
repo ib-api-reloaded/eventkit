@@ -27,7 +27,12 @@ class DelayTest(VirtualClockTestCase, unittest.TestCase):
         delayed = source.delay(1.0)
         for i in range(100):
             source.emit(i)
-        timers = [h for h in self.loop._scheduled if h._callback == delayed._release]
+        # TimerHandle._callback is private, absent from the asyncio stubs.
+        timers = [
+            h
+            for h in self.loop._scheduled
+            if getattr(h, "_callback") == delayed._release
+        ]
         self.assertEqual(len(timers), 1)
 
 
@@ -51,5 +56,10 @@ class ThrottleTest(VirtualClockTestCase, unittest.TestCase):
         throttled = source.throttle(10, 1.0)
         for i in range(100):
             source.emit(i)
-        timers = [h for h in self.loop._scheduled if h._callback == throttled._on_retry]
+        # TimerHandle._callback is private, absent from the asyncio stubs.
+        timers = [
+            h
+            for h in self.loop._scheduled
+            if getattr(h, "_callback") == throttled._on_retry
+        ]
         self.assertEqual(len(timers), 1)

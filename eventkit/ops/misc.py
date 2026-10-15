@@ -30,8 +30,6 @@ class EndOnError(Op):
         Op.__init__(self, source)
 
     def on_source_error(self, source, error):
-        if self._source is not None:
-            self._disconnect_from(self._source)
-            self._source = None
+        self._detach()
         self.error_event.emit(source, error)
         self.set_done()

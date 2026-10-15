@@ -59,7 +59,7 @@ class Take(Op):
         if self._n <= self._count:
             self.emit(*args)
         if self._n == self._count:
-            self._disconnect_from(self._source)
+            self._detach()
             self.set_done()
 
 
@@ -76,7 +76,7 @@ class TakeWhile(Op):
             self.emit(*args)
         else:
             self.set_done()
-            self._disconnect_from(self._source)
+            self._detach()
 
 
 @event_class

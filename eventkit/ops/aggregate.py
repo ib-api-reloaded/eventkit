@@ -111,7 +111,7 @@ class Ema(Op):
         if self._prev is NO_VALUE:
             value = args
         else:
-            value = [self._f2 * p + self._f1 * a for p, a in zip(self._prev, args)]
+            value = tuple(self._f2 * p + self._f1 * a for p, a in zip(self._prev, args))
         self._prev = value
         self.emit(*value)
 

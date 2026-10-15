@@ -35,7 +35,7 @@ class Op(Event):
     on_source = Event.emit
 
     def on_source_error(self, source, error):
-        if len(self.error_event):
+        if self._errors_have_listeners():
             self.error_event.emit(source, error)
         else:
             # Not inside an except block: pass the error for its traceback.
@@ -44,9 +44,7 @@ class Op(Event):
             )
 
     def on_source_done(self, _source):
-        if self._source is not None:
-            self._disconnect_from(self._source)
-            self._source = None
+        self._detach()
         self.set_done()
 
     def set_source(self, source):
@@ -67,3 +65,9 @@ class Op(Event):
 
     def _disconnect_from(self, source: Event):
         source.disconnect(self.on_source, self.on_source_error, self.on_source_done)
+
+    def _detach(self):
+        """Stop listening to the source, if attached (e.g. on ending)."""
+        if self._source is not None:
+            self._disconnect_from(self._source)
+            self._source = None
