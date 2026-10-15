@@ -5,3 +5,5 @@
    :maxdepth: 3
 
    api
+   upgrading
+   changelog

@@ -8,7 +8,7 @@ import weakref
 import pytest
 
 import eventkit
-from eventkit import Event
+from eventkit import Event, event_class
 from eventkit.ops.combine import Fork
 
 
@@ -64,3 +64,32 @@ def test_constructors_keep_their_signatures():
     assert Event(name="y").name() == "y"
     params = inspect.signature(eventkit.Timer.__init__).parameters
     assert list(params) == ["self", "interval", "count"]
+
+
+def test_upgrade_guide_subclass_examples():
+    """docs/upgrading.rst: a decorated subclass with a declared field, and
+    an undecorated subclass, which keeps working with a __dict__."""
+
+    @event_class
+    class QuoteEvent(Event):
+        symbol: str
+
+        def __init__(self, symbol: str):
+            Event.__init__(self, "quote")
+            self.symbol = symbol
+
+    quote = QuoteEvent("AAPL")
+    assert (quote.name(), quote.symbol) == ("quote", "AAPL")
+    with pytest.raises(AttributeError):
+        quote.undeclared = 1
+    seen = []
+    quote.connect(seen.append)
+    quote.emit(1)
+    assert seen == [1]
+
+    class Legacy(Event):
+        pass
+
+    legacy = Legacy("legacy")
+    legacy.anything = 1  # an undecorated subclass has a __dict__
+    assert legacy.anything == 1

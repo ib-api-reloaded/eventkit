@@ -26,7 +26,6 @@ html_theme = "sphinx_rtd_theme"
 html_theme_options = {
     "canonical_url": "https://eventkit.readthedocs.io",
     "logo_only": False,
-    "display_version": True,
     "prev_next_buttons_location": "bottom",
     "style_external_links": False,
     # Toc options

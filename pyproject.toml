@@ -44,10 +44,9 @@ dev = [
     { include-group = "test" },
 ]
 docs = [
-    "sphinx-autodoc-typehints>=2.0.0,<3.0.0",
-    "sphinx-rtd-theme>=2.0.0,<3.0.0",
-    "myst-parser>=2.0.0,<3.0.0",
-    "sphinxcontrib-napoleon>=0.7,<0.8",
+    "sphinx>=8.1.0",
+    "sphinx-autodoc-typehints>=3.0.0,<4.0.0",
+    "sphinx-rtd-theme>=2.0.0,<4.0.0",
 ]
 
 [build-system]
@@ -104,6 +103,7 @@ ignore_missing_imports = true
 import-name = "eventkit"
 smoke = "eventkit.Event('smoke').emit(1)"
 checks = ["make lint", "make test"]
+changelog = { path = "docs/changelog.rst", contains = "Version {version}", forbid = "Version {version} (Unreleased)" }
 
 [tool.releasekit.matrix]
 python = ["3.11", "3.12", "3.13", "3.14", "3.15", "pypy3.11"]

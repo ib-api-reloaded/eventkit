@@ -16,16 +16,23 @@ See the examples and the
 `introduction notebook <https://github.com/ib-api-reloaded/eventkit/tree/main/notebooks/eventkit_introduction.ipynb>`_
 to get a true feel for the possibilities.
 
-Note: The `eventkit` pypi name is now `aeventkit` but we still `import eventkit`
+Note: the package is published as ``aeventkit`` and imported as ``eventkit``.
 
 Installation
 ------------
 
 ::
 
-    pip3 install aeventkit
+    pip install aeventkit
 
-Python_ version 3.10+ is required.
+    pip install aeventkit[numpy]  # with the Array operators
+
+Python_ 3.11 or later is required (tested on CPython 3.11 to 3.15 and
+PyPy 3.11).
+
+Upgrading from 2.x? See `Upgrading to 3.0
+<https://eventkit.readthedocs.io/en/latest/upgrading.html>`_ and the
+`changelog <https://eventkit.readthedocs.io/en/latest/changelog.html>`_.
 
 
 Examples
@@ -68,6 +75,8 @@ Output::
 
 **Create a pipeline to get a running average and standard deviation**
 
+(with the numpy extra: ``pip install aeventkit[numpy]``)
+
 .. code-block:: python
 
     import random
@@ -99,7 +108,7 @@ Output::
         async for t in ev.Zip(ait('XYZ'), ait('123')):
             print(t)
 
-    asyncio.get_event_loop().run_until_complete(main())  # in Jupyter: await main()
+    asyncio.run(main())  # in Jupyter: await main()
 
 Output::
 
@@ -122,23 +131,11 @@ Output::
 Distributed computing
 ---------------------
 
-The `distex <https://github.com/erdewit/distex>`_ library provides a
-``poolmap`` extension method to put multiple cores or machines to use:
-
-.. code-block:: python
-
-    from distex import Pool
-    import eventkit as ev
-    import bz2
-
-    pool = Pool()
-    # await pool  # un-comment in Jupyter
-    data = [b'A' * 1000000] * 1000
-
-    pipe = ev.Sequence(data).poolmap(pool, bz2.compress).map(len).mean().last()
-
-    print(pipe.run())  # in Jupyter: print(await pipe)
-    pool.shutdown()
+The `distex <https://github.com/erdewit/distex>`_ library adds a
+``poolmap`` operator that spreads work over several cores or machines.
+It depends on the original ``eventkit`` package (it was last released in
+2022), which provides the same ``eventkit`` module as ``aeventkit``:
+installing it replaces one with the other.
 
 
 Inspired by:
@@ -172,7 +169,7 @@ The complete `API documentation <https://eventkit.readthedocs.io/en/latest/api.h
    :target: https://pypi.org/project/aeventkit/
 
 
-.. |PyVersion| image:: https://img.shields.io/badge/python-3.6+-blue.svg
+.. |PyVersion| image:: https://img.shields.io/badge/python-3.11+-blue.svg
    :alt:
 
 .. |Status| image:: https://img.shields.io/badge/status-stable-green.svg

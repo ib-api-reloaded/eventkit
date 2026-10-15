@@ -18,3 +18,7 @@ html/
 poetry.lock
 .python-version
 .venvs/
+
+# Sphinx output (Read the Docs builds the docs from source)
+docs/html/
+docs/_build/
