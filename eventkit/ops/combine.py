@@ -135,7 +135,7 @@ class Switch(AddableJoinOp):
         if not cb:
             cb = functools.partial(self.on_source_s, source)
             self._source2cb[source] = cb
-            source.connect(cb, self.on_source_error, self.on_source_done)
+            source.connect(cb, self.on_source_error, self.on_source_done, keep_ref=True)
 
     def _remove_source(self, source):
         if source in self._sources:
@@ -182,7 +182,7 @@ class Concat(AddableJoinOp):
         self._source2cb[source] = cb
         # Every source is watched from the start: its errors are passed on
         # right away, and its end is noticed even before its turn.
-        source.connect(cb, self.on_source_error, self.on_source_done)
+        source.connect(cb, self.on_source_error, self.on_source_done, keep_ref=True)
 
     def _on_source_s(self, source, *args):
         if self._sources[0] is source:
@@ -219,7 +219,7 @@ class Chain(AddableJoinOp):
 
             self._qq.append(q)
             # Values wait their turn; errors are passed on right away.
-            source.connect(cb, self.on_source_error)
+            source.connect(cb, self.on_source_error, keep_ref=True)
             self._source2cbs[source].append(cb)
         self._sources.append(source)
 
@@ -268,7 +268,7 @@ class Zip(JoinOp):
         self._results = [deque() for _ in self._inputs]
         for i, source in enumerate(self._inputs):
             cb = functools.partial(self._on_source_i, i)
-            source.connect(cb, self.on_source_error, self.on_source_done)
+            source.connect(cb, self.on_source_error, self.on_source_done, keep_ref=True)
             self._source2cbs[source].append(cb)
 
     def _on_source_i(self, i, *args):
@@ -329,7 +329,7 @@ class Ziplatest(JoinOp):
             if source.done():
                 continue
             cb = functools.partial(self._on_source_i, i)
-            source.connect(cb, self.on_source_error, self.on_source_done)
+            source.connect(cb, self.on_source_error, self.on_source_done, keep_ref=True)
             self._source2cbs[source].append(cb)
 
     def _on_source_i(self, i, *args):
