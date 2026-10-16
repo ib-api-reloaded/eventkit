@@ -9,6 +9,9 @@ PYTEST := pytest -q -p no:cacheprovider -W error::DeprecationWarning --timeout=$
 RELEASEKIT ?= releasekit
 # test-matrix: a subset of the configured Python versions, e.g. "3.13 3.15".
 PYTHONS ?=
+# Extra `uv run` arguments for the tests. `releasekit ... --with-local PATH`
+# sets them to layer a dependency's checkout over the environment.
+UV_RUN_ARGS ?=
 
 .PHONY: help ruff typecheck lint test test-matrix test-repeat build release-check release publish-dry-run publish publish-test
 
@@ -40,7 +43,7 @@ typecheck:
 lint: ruff typecheck
 
 test:
-	uv run --all-extras --no-dev --group test $(PYTEST)
+	uv run --all-extras --no-dev --group test $(UV_RUN_ARGS) $(PYTEST)
 
 test-matrix:
 	$(RELEASEKIT) matrix $(foreach v,$(PYTHONS),--python=$(v))
