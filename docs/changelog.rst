@@ -1,6 +1,21 @@
 Changelog
 =========
 
+Version 3.0.1 (Unreleased)
+--------------------------
+
+* The join operators (``merge``, ``switch``, ``concat``, ``chain``,
+  ``zip`` and ``ziplatest``) now hold the callbacks they connect to
+  their sources with strong references. Before, they used the default
+  weak reference. CPython kept the callbacks anyway, because its
+  ``functools.partial`` cannot be weakly referenced. PyPy collected them,
+  and a pipeline through a join operator then stopped delivering.
+  ``Event.connect`` now holds a ``functools.partial`` the same way it
+  holds a function, so the rule is the same on every interpreter.
+* Tested on PyPy 3.12 as well. The numpy extra is for CPython only. numpy
+  publishes no wheel for PyPy 3.12, and the Array operators are not
+  supported on PyPy.
+
 Version 3.0.0
 -------------
 

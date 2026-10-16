@@ -8,8 +8,8 @@ changes and fixes.
 Python 3.11 or later
 --------------------
 
-Python 3.10 is no longer supported. 3.0 is tested on CPython 3.11 to 3.15
-and PyPy 3.11.
+Python 3.10 is no longer supported. Version 3.0 is tested on CPython 3.11
+to 3.15 and on PyPy 3.11 and 3.12. The numpy extra is for CPython only.
 
 numpy is an extra
 -----------------
