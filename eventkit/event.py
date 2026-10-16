@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import builtins
+import functools
 import itertools
 import logging
 import types
@@ -336,10 +337,15 @@ class Event:
             done: The callback to invoke on ending of this event.
                 It gets this event as single argument.
             keep_ref:
-                * ``True``: A strong reference to the callable is kept
-                * ``False``: If the callable allows weak refs and it is
-                  garbage collected, then it is automatically disconnected
-                  from this event.
+                * ``True``: The event keeps a strong reference to the
+                  callable.
+                * ``False``: For a bound method, the event keeps a weak
+                  reference to the method's instance. For a callable object
+                  that supports weak references, the event keeps a weak
+                  reference to the object. When that object is garbage
+                  collected, the listener is disconnected. Functions,
+                  built-ins and ``functools.partial`` objects are held
+                  strongly on every interpreter.
         """
         if isinstance(listener, Op):
             # let the operator connect itself to this event
@@ -586,6 +592,14 @@ class Event:
         Split given callable in (object, function) tuple.
         """
         if isinstance(c, types.FunctionType):
+            return (None, c)
+
+        if isinstance(c, functools.partial):
+            # A partial is held like a function. The connecting code
+            # created it, so the event is its only owner. PyPy partials
+            # support weak references and CPython partials do not. The
+            # generic rule below would hold a partial weakly on PyPy and
+            # strongly on CPython.
             return (None, c)
 
         if isinstance(c, types.MethodType):
