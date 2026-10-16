@@ -11,6 +11,7 @@ would appear in this test as a missing value.
 
 import gc
 
+from hypothesis import settings
 from hypothesis import strategies as st
 from hypothesis.stateful import RuleBasedStateMachine, invariant, precondition, rule
 
@@ -63,3 +64,7 @@ class JoinUnderCollection(RuleBasedStateMachine):
 
 
 TestJoinUnderCollection = JoinUnderCollection.TestCase
+# A full collection is slow on PyPy, so each example runs ten steps instead
+# of the default fifty. The defect this test guards against appears within
+# one collection after the pipeline is built.
+TestJoinUnderCollection.settings = settings(stateful_step_count=10)
