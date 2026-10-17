@@ -1,8 +1,8 @@
 Changelog
 =========
 
-Version 3.0.1 (Unreleased)
---------------------------
+Version 3.0.1
+-------------
 
 * The join operators (``merge``, ``switch``, ``concat``, ``chain``,
   ``zip`` and ``ziplatest``) now hold the callbacks they connect to
