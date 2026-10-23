@@ -15,7 +15,6 @@ docs/doctrees
 eventkit.egg-info
 dist/
 html/
-poetry.lock
 .python-version
 .venvs/
 
