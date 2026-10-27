@@ -4,6 +4,7 @@ import math
 import platform
 import unittest
 import weakref
+from typing import assert_type
 
 import eventkit as ev
 from eventkit import Event
@@ -171,6 +172,23 @@ class EventTest(unittest.TestCase):
         for i in range(10):
             ev1.emit(i)
         self.assertEqual(result, list(range(10, 20)))
+
+    def test_connect_and_disconnect_return_the_event_itself(self):
+        # A subclass stays its own type through += and -= (mypy checks the
+        # assert_type calls), so an attribute typed as the subclass can be
+        # assigned the result.
+        class Updates(Event):
+            pass
+
+        updates = Updates("updates")
+        listener = Object()
+        assert_type(updates.connect(listener), Updates)
+        assert_type(updates.disconnect(listener), Updates)
+        assert_type(updates.disconnect_all(listener), Updates)
+        before = updates
+        updates += listener
+        updates -= listener
+        self.assertIs(updates, before)
 
     def test_emit_threadsafe(self):
         async def coro(d):

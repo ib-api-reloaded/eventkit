@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any as AnyType
 from typing import (
     ClassVar,
+    Self,
     TypeVar,
 )
 
@@ -306,7 +307,7 @@ class Event:
 
         return NO_VALUE if v is NO_VALUE else v[0] if len(v) == 1 else v or NO_VALUE
 
-    def connect(self, listener, error=None, done=None, keep_ref: bool = False) -> Event:
+    def connect(self, listener, error=None, done=None, keep_ref: bool = False) -> Self:
         """
         Connect a listener to this event. If the listener is added multiple
         times then it is invoked just as many times on emit.
@@ -369,7 +370,7 @@ class Event:
 
         return self
 
-    def disconnect(self, listener, error=None, done=None):
+    def disconnect(self, listener, error=None, done=None) -> Self:
         """
         Undo one :meth:`connect`: remove one connection of the listener
         (and of the given error and done callbacks). A listener connected
@@ -389,7 +390,7 @@ class Event:
         """
         return self._disconnect(listener, error, done, every=False)
 
-    def disconnect_all(self, listener, error=None, done=None):
+    def disconnect_all(self, listener, error=None, done=None) -> Self:
         """
         Remove every connection of the listener (and of the given error
         and done callbacks), however many times it was connected.
@@ -401,7 +402,7 @@ class Event:
         """
         return self._disconnect(listener, error, done, every=True)
 
-    def _disconnect(self, listener, error, done, *, every: bool):
+    def _disconnect(self, listener, error, done, *, every: bool) -> Self:
         if isinstance(listener, Op):
             # the inverse of connect(op): detach the operator from this event
             if listener._source is self:
